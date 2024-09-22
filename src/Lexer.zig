@@ -28,7 +28,8 @@ fn skipTrivia(self: *@This()) !void {
 
         if (i != 0) try self.put(i, .trivia);
         break;
-    }
+    } else if (self.source_code.len != 0)
+        try self.put(self.source_code.len, .trivia);
 }
 
 fn put(self: *@This(), len: usize, kind: SyntaxKind) !void {
