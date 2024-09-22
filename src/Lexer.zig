@@ -30,7 +30,9 @@ pub fn lex(
         } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
             try self.put(token_len, .identifier_or_number);
         } else if (nonZero(std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len)) |token_len| {
-            // Invalid bytes
+            // TODO: where?
+            const message = if (token_len == 1) "invalid byte" else "invalid bytes";
+            try self.diagnostics.@"error"(message);
             try self.put(token_len, .@"error");
         } else {
             // TODO: lex string literals
