@@ -27,10 +27,14 @@ pub fn lex(
                 try self.put(symbol.text.len, @enumFromInt(symbol.raw));
                 break;
             }
-        } else {
-            // TODO: lex identifiers, numbers and strings
-            const token_len = std.mem.indexOfAny(u8, self.source_code, &std.ascii.whitespace) orelse self.source_code.len;
+        } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
+            try self.put(token_len, .identifier_or_number);
+        } else if (nonZero(std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len)) |token_len| {
+            // Invalid bytes
             try self.put(token_len, .@"error");
+        } else {
+            // TODO: lex string literals
+            unreachable;
         }
     }
 
@@ -150,15 +154,19 @@ const SyntaxKind = enum {
     @"!=",
     @"!",
 
+    identifier_or_number,
+
     trivia,
     @"error",
     eof,
 };
 
-const symbols = blk: {
-    @setEvalBranchQuota(6000);
+const identifier_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._";
+const all_valid_chars = identifier_chars ++ "!#%&()*+,-/:;<=>?@[]^{|}";
 
-    const identifier_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ._";
+const symbols = blk: {
+    @setEvalBranchQuota(7000);
+
     const syntax_kinds = @typeInfo(SyntaxKind).@"enum".fields;
     var array: [syntax_kinds.len]struct { text: []const u8, raw: comptime_int } = undefined;
     var len = 0;
@@ -170,6 +178,10 @@ const symbols = blk: {
     }
     break :blk array[0..len].*;
 };
+
+fn nonZero(n: anytype) ?@TypeOf(n) {
+    return if (n == 0) null else n;
+}
 
 test "fuzz lexer" {
     const input_bytes = std.testing.fuzzInput(.{});
