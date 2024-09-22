@@ -20,7 +20,7 @@ const S = struct {
     pub fn show(self: @This()) !void {
         const writer = std.io.getStdErr().writer();
         for (self.diagnostics.items(.level), self.diagnostics.items(.message)) |level, message| {
-            try writer.print("{}: {s}\n", .{ level, message });
+            try writer.print("{s}: {s}\n", .{ @tagName(level), message });
         }
     }
 
