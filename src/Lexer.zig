@@ -22,9 +22,16 @@ pub fn lex(
         try self.skipTrivia();
         if (self.source_code.len == 0) break;
 
-        // FIXME: lex things properly instead of only checking whitespace
-        const token_len = std.mem.indexOfAny(u8, self.source_code, &std.ascii.whitespace) orelse self.source_code.len;
-        try self.put(token_len, .@"error");
+        inline for (symbols) |symbol| {
+            if (std.mem.startsWith(u8, self.source_code, symbol.text)) {
+                try self.put(symbol.text.len, @enumFromInt(symbol.raw));
+                break;
+            }
+        } else {
+            // TODO: lex identifiers, numbers and strings
+            const token_len = std.mem.indexOfAny(u8, self.source_code, &std.ascii.whitespace) orelse self.source_code.len;
+            try self.put(token_len, .@"error");
+        }
     }
 
     return self.token_stream;
@@ -85,9 +92,83 @@ const Token = struct {
 };
 
 const SyntaxKind = enum {
+    @"~",
+    @"}",
+    @"||",
+    @"|=",
+    @"|",
+    @"{",
+    @"^=",
+    @"^",
+    @"]",
+    @"[",
+    @"@",
+    @"?",
+    @">>=",
+    @">>",
+    @">=",
+    @">",
+    @"==",
+    @"=",
+    @"<=",
+    @"<<=",
+    @"<<",
+    @"<",
+    @";",
+    @"::",
+    @":",
+    @"/=",
+    @"/",
+    @"-=",
+    @"--",
+    @"-",
+    @",",
+    @"+=",
+    @"++",
+    @"+",
+    @"*=",
+    @"*",
+    @")",
+    @"(",
+    @"&=",
+    @"&&",
+    @"&",
+    @"%=",
+    @"%",
+    @"#>=",
+    @"#>",
+    @"#==",
+    @"#<=",
+    @"#<",
+    @"#/",
+    @"#-",
+    @"#+",
+    @"#*",
+    @"##",
+    @"#!=",
+    @"#",
+    @"!=",
+    @"!",
+
     trivia,
     @"error",
     eof,
+};
+
+const symbols = blk: {
+    @setEvalBranchQuota(6000);
+
+    const identifier_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ._";
+    const syntax_kinds = @typeInfo(SyntaxKind).@"enum".fields;
+    var array: [syntax_kinds.len]struct { text: []const u8, raw: comptime_int } = undefined;
+    var len = 0;
+    for (syntax_kinds, 0..) |kind, i| {
+        if (std.mem.indexOfAny(u8, kind.name, identifier_chars) == null) {
+            array[len] = .{ .text = kind.name, .raw = i };
+            len += 1;
+        }
+    }
+    break :blk array[0..len].*;
 };
 
 test "fuzz lexer" {
