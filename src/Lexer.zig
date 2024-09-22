@@ -92,6 +92,9 @@ const SyntaxKind = enum {
 
 test "fuzz lexer" {
     const input_bytes = std.testing.fuzzInput(.{});
-    const tokens = try lex(input_bytes);
-    defer tokens.deinit(std.testing.allocator);
+    const gpa = std.testing.allocator;
+    var diagnostics = Diagnostic.S.init(gpa);
+    defer diagnostics.deinit();
+    const tokens = try lex(input_bytes, &diagnostics, gpa);
+    defer tokens.deinit(gpa);
 }
