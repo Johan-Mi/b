@@ -1,5 +1,5 @@
 const Diagnostic = @import("Diagnostic.zig");
-const lexer = @import("lexer.zig");
+const Lexer = @import("Lexer.zig");
 const std = @import("std");
 
 pub fn main() !u8 {
@@ -18,8 +18,12 @@ pub fn main() !u8 {
 
 fn realMain(allocator: std.mem.Allocator) !void {
     const source_code = "this is some source code";
-    const token_stream = try lexer.lex(source_code);
+    const token_stream = try Lexer.lex(source_code, allocator);
     defer token_stream.deinit(allocator);
+
+    for (token_stream.tokens.items(.kind), token_stream.tokens.items(.source)) |kind, source| {
+        std.log.debug("{s} «{s}»", .{ @tagName(kind), source });
+    }
 }
 
 test {
