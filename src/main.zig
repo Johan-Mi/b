@@ -10,14 +10,32 @@ pub fn main() !u8 {
     var diagnostics = Diagnostic.S.init(allocator);
     defer diagnostics.deinit();
 
-    realMain(allocator) catch |err| try diagnostics.@"error"(@errorName(err));
+    realMain(allocator, &diagnostics) catch |err| try diagnostics.@"error"(@errorName(err));
 
     try diagnostics.show();
     return @intFromBool(!diagnostics.is_ok());
 }
 
-fn realMain(allocator: std.mem.Allocator) !void {
-    const source_code = "this is some source code";
+fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
+    const source_code = blk: {
+        const args = try std.process.argsAlloc(allocator);
+        defer std.process.argsFree(allocator, args);
+
+        // TODO: print usage information
+        if (args.len < 2)
+            return try diagnostics.@"error"("no source file provided");
+        if (3 <= args.len)
+            return try diagnostics.@"error"("too many command line arguments");
+        const source_path = args[1];
+
+        break :blk std.fs.cwd().readFileAlloc(allocator, source_path, std.math.maxInt(usize)) catch |err| {
+            try diagnostics.@"error"("failed to read source code");
+            try diagnostics.note(@errorName(err));
+            return;
+        };
+    };
+    defer allocator.free(source_code);
+
     const token_stream = try Lexer.lex(source_code, allocator);
     defer token_stream.deinit(allocator);
 

@@ -13,6 +13,10 @@ pub const S = struct {
         return .{ .gpa = gpa };
     }
 
+    pub fn note(self: *@This(), message: []const u8) !void {
+        try self.diagnostics.append(self.gpa, .{ .level = .note, .message = message });
+    }
+
     pub fn @"error"(self: *@This(), message: []const u8) !void {
         try self.diagnostics.append(self.gpa, .{ .level = .@"error", .message = message });
     }
@@ -35,5 +39,6 @@ pub const S = struct {
 };
 
 const Level = enum {
+    note,
     @"error",
 };
