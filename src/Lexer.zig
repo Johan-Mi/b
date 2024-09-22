@@ -184,10 +184,17 @@ fn nonZero(n: anytype) ?@TypeOf(n) {
 }
 
 test "fuzz lexer" {
-    const input_bytes = std.testing.fuzzInput(.{});
+    var input_bytes = std.testing.fuzzInput(.{});
     const gpa = std.testing.allocator;
     var diagnostics = Diagnostic.S.init(gpa);
     defer diagnostics.deinit();
     const tokens = try lex(input_bytes, &diagnostics, gpa);
     defer tokens.deinit(gpa);
+
+    // Token stream must match input.
+    for (tokens.tokens.items(.source)) |token| {
+        try std.testing.expectStringStartsWith(input_bytes, token);
+        input_bytes = input_bytes[token.len..];
+    }
+    try std.testing.expectEqualStrings("", input_bytes);
 }
