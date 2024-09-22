@@ -5,7 +5,7 @@ const Diagnostic = @This();
 level: Level,
 message: []const u8,
 
-const S = struct {
+pub const S = struct {
     diagnostics: std.MultiArrayList(Diagnostic) = .{},
     gpa: std.mem.Allocator,
 
@@ -24,8 +24,13 @@ const S = struct {
         }
     }
 
+    pub fn is_ok(self: @This()) bool {
+        return std.mem.indexOfScalar(Level, self.diagnostics.items(.level), .@"error") == null;
+    }
+
     pub fn deinit(self: @This()) void {
-        self.diagnostics.deinit(self.gpa);
+        var diagnostics = self.diagnostics;
+        diagnostics.deinit(self.gpa);
     }
 };
 
