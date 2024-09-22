@@ -36,7 +36,7 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     };
     defer allocator.free(source_code);
 
-    const token_stream = try Lexer.lex(source_code, allocator);
+    const token_stream = try Lexer.lex(source_code, diagnostics, allocator);
     defer token_stream.deinit(allocator);
 
     for (token_stream.tokens.items(.kind), token_stream.tokens.items(.source)) |kind, source| {

@@ -1,11 +1,21 @@
+const Diagnostic = @import("Diagnostic.zig");
 const std = @import("std");
 
 source_code: []const u8,
 token_stream: TokenStream = .{},
+diagnostics: *Diagnostic.S,
 gpa: std.mem.Allocator,
 
-pub fn lex(source_code: []const u8, gpa: std.mem.Allocator) !TokenStream {
-    var self = @This(){ .source_code = source_code, .gpa = gpa };
+pub fn lex(
+    source_code: []const u8,
+    diagnostics: *Diagnostic.S,
+    gpa: std.mem.Allocator,
+) !TokenStream {
+    var self = @This(){
+        .source_code = source_code,
+        .diagnostics = diagnostics,
+        .gpa = gpa,
+    };
     errdefer self.token_stream.deinit(gpa);
 
     while (true) {
@@ -21,14 +31,34 @@ pub fn lex(source_code: []const u8, gpa: std.mem.Allocator) !TokenStream {
 }
 
 fn skipTrivia(self: *@This()) !void {
-    for (0.., self.source_code) |i, c| {
-        // TODO: comments
-        if (std.ascii.isWhitespace(c)) continue;
+    const State = enum { normal, comment, end_of_comment };
 
-        if (i != 0) try self.put(i, .trivia);
-        break;
-    } else if (self.source_code.len != 0)
-        try self.put(self.source_code.len, .trivia);
+    var state: State = .normal;
+    for (0.., self.source_code) |i, c| {
+        switch (state) {
+            .normal => {
+                if (std.ascii.isWhitespace(c)) continue;
+                if (std.mem.startsWith(u8, self.source_code[i..], "/*")) {
+                    state = .comment;
+                    continue;
+                }
+
+                if (i != 0) try self.put(i, .trivia);
+                break;
+            },
+            .comment => {
+                if (std.mem.startsWith(u8, self.source_code[i..], "*/"))
+                    state = .end_of_comment;
+            },
+            // Skip the slash
+            .end_of_comment => state = .normal,
+        }
+    } else {
+        if (state != .normal) // TODO: where?
+            try self.diagnostics.@"error"("unterminated comment");
+        if (self.source_code.len != 0)
+            try self.put(self.source_code.len, .trivia);
+    }
 }
 
 fn put(self: *@This(), len: usize, kind: SyntaxKind) !void {
