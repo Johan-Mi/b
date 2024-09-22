@@ -14,7 +14,6 @@ pub fn lex(source_code: []const u8, gpa: std.mem.Allocator) !TokenStream {
 
         // FIXME: lex things properly instead of only checking whitespace
         const token_len = std.mem.indexOfAny(u8, self.source_code, &std.ascii.whitespace) orelse self.source_code.len;
-        std.debug.assert(token_len != 0);
         try self.put(token_len, .@"error");
     }
 
@@ -33,6 +32,7 @@ fn skipTrivia(self: *@This()) !void {
 }
 
 fn put(self: *@This(), len: usize, kind: SyntaxKind) !void {
+    std.debug.assert(len != 0);
     try self.token_stream.tokens.append(self.gpa, .{
         .kind = kind,
         .source = self.source_code[0..len],
