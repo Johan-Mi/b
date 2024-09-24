@@ -41,7 +41,6 @@ pub fn lex(
                     '`' => .bcd_literal,
                     else => unreachable,
                 };
-                // TODO: escape sequences
                 const token_len = if (std.mem.indexOfScalarPos(u8, self.source_code, 1, quote)) |end|
                     end + 1
                 else
@@ -51,7 +50,6 @@ pub fn lex(
             else => {
                 const token_len = std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len;
                 std.debug.assert(token_len != 0);
-                // TODO: where?
                 const message = if (token_len == 1) "invalid byte" else "invalid bytes";
                 try self.diagnostics.@"error"(message);
                 try self.put(token_len, .@"error");
@@ -86,7 +84,7 @@ fn skipTrivia(self: *@This()) !void {
             .end_of_comment => state = .normal,
         }
     } else {
-        if (state != .normal) // TODO: where?
+        if (state != .normal)
             try self.diagnostics.@"error"("unterminated comment");
         if (self.source_code.len != 0)
             try self.put(self.source_code.len, .trivia);
