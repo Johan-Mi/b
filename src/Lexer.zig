@@ -241,7 +241,9 @@ fn nonZero(n: anytype) ?@TypeOf(n) {
 test "fuzz lexer" {
     var input_bytes = std.testing.fuzzInput(.{});
     const gpa = std.testing.allocator;
-    var diagnostics = Diagnostic.S.init(gpa);
+    var string_arena = std.heap.ArenaAllocator.init(gpa);
+    defer string_arena.deinit();
+    var diagnostics = Diagnostic.S.init(gpa, string_arena.allocator());
     defer diagnostics.deinit();
     const tokens = try lex(input_bytes, &diagnostics, gpa);
     defer tokens.deinit(gpa);

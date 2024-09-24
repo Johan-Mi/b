@@ -7,7 +7,9 @@ pub fn main() !u8 {
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
-    var diagnostics = Diagnostic.S.init(allocator);
+    var string_arena = std.heap.ArenaAllocator.init(allocator);
+    defer string_arena.deinit();
+    var diagnostics = Diagnostic.S.init(allocator, string_arena.allocator());
     defer diagnostics.deinit();
 
     realMain(allocator, &diagnostics) catch |err| try diagnostics.@"error"(@errorName(err));

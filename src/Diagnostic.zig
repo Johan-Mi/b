@@ -8,9 +8,14 @@ message: []const u8,
 pub const S = struct {
     diagnostics: std.MultiArrayList(Diagnostic) = .{},
     gpa: std.mem.Allocator,
+    string_arena: std.mem.Allocator,
 
-    pub fn init(gpa: std.mem.Allocator) @This() {
-        return .{ .gpa = gpa };
+    pub fn init(gpa: std.mem.Allocator, string_arena: std.mem.Allocator) @This() {
+        return .{ .gpa = gpa, .string_arena = string_arena };
+    }
+
+    pub fn format(self: *@This(), comptime fmt: []const u8, args: anytype) ![]const u8 {
+        return try std.fmt.allocPrint(self.string_arena, fmt, args);
     }
 
     pub fn note(self: *@This(), message: []const u8) !void {
