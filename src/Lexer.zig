@@ -28,7 +28,9 @@ pub fn lex(
                 break;
             }
         } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
-            const kind: SyntaxKind = if (std.ascii.isDigit(self.source_code[0])) .number else .identifier;
+            const text = self.source_code[0..token_len];
+            const kind: SyntaxKind = keywords.get(text) orelse
+                if (std.ascii.isDigit(self.source_code[0])) .number else .identifier;
             try self.put(token_len, kind);
         } else switch (self.source_code[0]) {
             '"', '\'', '`' => {
@@ -112,6 +114,22 @@ const Token = struct {
 };
 
 const SyntaxKind = enum {
+    kw_auto,
+    kw_extrn,
+    kw_if,
+    kw_else,
+    kw_for,
+    kw_while,
+    kw_repeat,
+    kw_switch,
+    kw_do,
+    kw_return,
+    kw_break,
+    kw_goto,
+    kw_next,
+    kw_case,
+    kw_default,
+
     @"~",
     @"}",
     @"||",
@@ -183,6 +201,20 @@ const SyntaxKind = enum {
 
 const identifier_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._";
 const all_valid_chars = identifier_chars ++ "!\"#%&'()*+,-/:;<=>?@[]^`{|}";
+
+const keywords = blk: {
+    const prefix = "kw_";
+    const syntax_kinds = @typeInfo(SyntaxKind).@"enum".fields;
+    var array: [syntax_kinds.len]struct { []const u8, SyntaxKind } = undefined;
+    var len = 0;
+    for (syntax_kinds, 0..) |kind, i| {
+        if (std.mem.startsWith(u8, kind.name, prefix)) {
+            array[len] = .{ kind.name[prefix.len..], @enumFromInt(i) };
+            len += 1;
+        }
+    }
+    break :blk std.StaticStringMap(SyntaxKind).initComptime(array[0..len]);
+};
 
 const symbols = blk: {
     @setEvalBranchQuota(7000);
