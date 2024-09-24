@@ -23,11 +23,15 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         const args = try std.process.argsAlloc(allocator);
         defer std.process.argsFree(allocator, args);
 
-        // TODO: print usage information
-        if (args.len < 2)
-            return try diagnostics.@"error"("no source file provided");
-        if (3 <= args.len)
-            return try diagnostics.@"error"("too many command line arguments");
+        const me = if (1 <= args.len) args[0] else "b";
+        if (args.len != 2) {
+            if (args.len < 2)
+                try diagnostics.@"error"("no source file provided");
+            if (3 <= args.len)
+                try diagnostics.@"error"("too many command line arguments");
+            const usage = try diagnostics.format("usage: {s} SOURCE.b", .{me});
+            return try diagnostics.note(usage);
+        }
         const source_path = args[1];
 
         break :blk std.fs.cwd().readFileAlloc(allocator, source_path, std.math.maxInt(usize)) catch |err| {
