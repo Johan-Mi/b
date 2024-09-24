@@ -42,7 +42,10 @@ pub fn lex(
                     else => unreachable,
                 };
                 // TODO: escape sequences
-                const token_len = 2 + (std.mem.indexOfScalar(u8, self.source_code[1..], quote) orelse self.source_code.len - 1);
+                const token_len = if (std.mem.indexOfScalar(u8, self.source_code[1..], quote)) |end|
+                    end + 2
+                else
+                    self.source_code.len;
                 try self.put(token_len, kind);
             },
             else => {
