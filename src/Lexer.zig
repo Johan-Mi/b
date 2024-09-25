@@ -2,9 +2,7 @@ const Diagnostic = @import("Diagnostic.zig");
 const std = @import("std");
 
 source_code: []const u8,
-tokens: std.MultiArrayList(Token) = .{},
 diagnostics: *Diagnostic.S,
-gpa: std.mem.Allocator,
 
 pub fn lex(
     source_code: []const u8,
@@ -14,29 +12,31 @@ pub fn lex(
     var self = @This(){
         .source_code = source_code,
         .diagnostics = diagnostics,
-        .gpa = gpa,
     };
-    errdefer self.tokens.deinit(gpa);
 
-    while (try self.next()) {}
+    var tokens = std.MultiArrayList(Token){};
+    errdefer tokens.deinit(gpa);
 
-    return self.tokens;
+    while (try self.next()) |token| {
+        try tokens.append(gpa, token);
+        self.source_code = self.source_code[token.source.len..];
+    }
+
+    return tokens;
 }
 
-fn next(self: *@This()) !bool {
-    try self.skipTrivia();
-    if (self.source_code.len == 0) return false;
+fn next(self: *@This()) !?Token {
+    if (try self.skipTrivia()) |trivia| return trivia;
+    if (self.source_code.len == 0) return null;
 
     inline for (symbols) |symbol| {
-        if (std.mem.startsWith(u8, self.source_code, symbol.text)) {
-            try self.put(symbol.text.len, @enumFromInt(symbol.raw));
-            break;
-        }
+        if (std.mem.startsWith(u8, self.source_code, symbol.text))
+            return self.makeToken(symbol.text.len, @enumFromInt(symbol.raw));
     } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
         const text = self.source_code[0..token_len];
         const kind: SyntaxKind = keywords.get(text) orelse
             if (std.ascii.isDigit(self.source_code[0])) .number else .identifier;
-        try self.put(token_len, kind);
+        return self.makeToken(token_len, kind);
     } else switch (self.source_code[0]) {
         '"', '\'', '`' => {
             const quote = self.source_code[0];
@@ -50,21 +50,19 @@ fn next(self: *@This()) !bool {
                 end + 1
             else
                 self.source_code.len;
-            try self.put(token_len, kind);
+            return self.makeToken(token_len, kind);
         },
         else => {
             const token_len = std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len;
             std.debug.assert(token_len != 0);
             const message = if (token_len == 1) "invalid byte" else "invalid bytes";
             try self.diagnostics.@"error"(message);
-            try self.put(token_len, .@"error");
+            return self.makeToken(token_len, .@"error");
         },
     }
-
-    return true;
 }
 
-fn skipTrivia(self: *@This()) !void {
+fn skipTrivia(self: *@This()) !?Token {
     const State = enum { normal, comment, end_of_comment };
 
     var state: State = .normal;
@@ -76,9 +74,7 @@ fn skipTrivia(self: *@This()) !void {
                     state = .comment;
                     continue;
                 }
-
-                if (i != 0) try self.put(i, .trivia);
-                break;
+                return if (i == 0) null else self.makeToken(i, .trivia);
             },
             .comment => {
                 if (std.mem.startsWith(u8, self.source_code[i..], "*/"))
@@ -90,18 +86,16 @@ fn skipTrivia(self: *@This()) !void {
     } else {
         if (state != .normal)
             try self.diagnostics.@"error"("unterminated comment");
-        if (self.source_code.len != 0)
-            try self.put(self.source_code.len, .trivia);
+        return if (self.source_code.len == 0)
+            null
+        else
+            self.makeToken(self.source_code.len, .trivia);
     }
 }
 
-fn put(self: *@This(), len: usize, kind: SyntaxKind) !void {
+fn makeToken(self: @This(), len: usize, kind: SyntaxKind) Token {
     std.debug.assert(len != 0);
-    try self.tokens.append(self.gpa, .{
-        .kind = kind,
-        .source = self.source_code[0..len],
-    });
-    self.source_code = self.source_code[len..];
+    return .{ .kind = kind, .source = self.source_code[0..len] };
 }
 
 const Token = struct {
