@@ -18,46 +18,50 @@ pub fn lex(
     };
     errdefer self.tokens.deinit(gpa);
 
-    while (true) {
-        try self.skipTrivia();
-        if (self.source_code.len == 0) break;
-
-        inline for (symbols) |symbol| {
-            if (std.mem.startsWith(u8, self.source_code, symbol.text)) {
-                try self.put(symbol.text.len, @enumFromInt(symbol.raw));
-                break;
-            }
-        } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
-            const text = self.source_code[0..token_len];
-            const kind: SyntaxKind = keywords.get(text) orelse
-                if (std.ascii.isDigit(self.source_code[0])) .number else .identifier;
-            try self.put(token_len, kind);
-        } else switch (self.source_code[0]) {
-            '"', '\'', '`' => {
-                const quote = self.source_code[0];
-                const kind: SyntaxKind = switch (quote) {
-                    '"' => .string_literal,
-                    '\'' => .character_literal,
-                    '`' => .bcd_literal,
-                    else => unreachable,
-                };
-                const token_len = if (std.mem.indexOfScalarPos(u8, self.source_code, 1, quote)) |end|
-                    end + 1
-                else
-                    self.source_code.len;
-                try self.put(token_len, kind);
-            },
-            else => {
-                const token_len = std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len;
-                std.debug.assert(token_len != 0);
-                const message = if (token_len == 1) "invalid byte" else "invalid bytes";
-                try self.diagnostics.@"error"(message);
-                try self.put(token_len, .@"error");
-            },
-        }
-    }
+    while (try self.next()) {}
 
     return self.tokens;
+}
+
+fn next(self: *@This()) !bool {
+    try self.skipTrivia();
+    if (self.source_code.len == 0) return false;
+
+    inline for (symbols) |symbol| {
+        if (std.mem.startsWith(u8, self.source_code, symbol.text)) {
+            try self.put(symbol.text.len, @enumFromInt(symbol.raw));
+            break;
+        }
+    } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
+        const text = self.source_code[0..token_len];
+        const kind: SyntaxKind = keywords.get(text) orelse
+            if (std.ascii.isDigit(self.source_code[0])) .number else .identifier;
+        try self.put(token_len, kind);
+    } else switch (self.source_code[0]) {
+        '"', '\'', '`' => {
+            const quote = self.source_code[0];
+            const kind: SyntaxKind = switch (quote) {
+                '"' => .string_literal,
+                '\'' => .character_literal,
+                '`' => .bcd_literal,
+                else => unreachable,
+            };
+            const token_len = if (std.mem.indexOfScalarPos(u8, self.source_code, 1, quote)) |end|
+                end + 1
+            else
+                self.source_code.len;
+            try self.put(token_len, kind);
+        },
+        else => {
+            const token_len = std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len;
+            std.debug.assert(token_len != 0);
+            const message = if (token_len == 1) "invalid byte" else "invalid bytes";
+            try self.diagnostics.@"error"(message);
+            try self.put(token_len, .@"error");
+        },
+    }
+
+    return true;
 }
 
 fn skipTrivia(self: *@This()) !void {
