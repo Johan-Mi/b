@@ -42,10 +42,10 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     };
     defer allocator.free(source_code);
 
-    const token_stream = try Lexer.lex(source_code, diagnostics, allocator);
-    defer token_stream.deinit(allocator);
+    var tokens = try Lexer.lex(source_code, diagnostics, allocator);
+    defer tokens.deinit(allocator);
 
-    for (token_stream.tokens.items(.kind), token_stream.tokens.items(.source)) |kind, source| {
+    for (tokens.items(.kind), tokens.items(.source)) |kind, source| {
         std.log.debug("{s} «{s}»", .{ @tagName(kind), source });
     }
 }

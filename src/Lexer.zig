@@ -2,7 +2,7 @@ const Diagnostic = @import("Diagnostic.zig");
 const std = @import("std");
 
 source_code: []const u8,
-token_stream: TokenStream = .{},
+tokens: std.MultiArrayList(Token) = .{},
 diagnostics: *Diagnostic.S,
 gpa: std.mem.Allocator,
 
@@ -10,13 +10,13 @@ pub fn lex(
     source_code: []const u8,
     diagnostics: *Diagnostic.S,
     gpa: std.mem.Allocator,
-) !TokenStream {
+) !std.MultiArrayList(Token) {
     var self = @This(){
         .source_code = source_code,
         .diagnostics = diagnostics,
         .gpa = gpa,
     };
-    errdefer self.token_stream.deinit(gpa);
+    errdefer self.tokens.deinit(gpa);
 
     while (true) {
         try self.skipTrivia();
@@ -57,7 +57,7 @@ pub fn lex(
         }
     }
 
-    return self.token_stream;
+    return self.tokens;
 }
 
 fn skipTrivia(self: *@This()) !void {
@@ -93,21 +93,12 @@ fn skipTrivia(self: *@This()) !void {
 
 fn put(self: *@This(), len: usize, kind: SyntaxKind) !void {
     std.debug.assert(len != 0);
-    try self.token_stream.tokens.append(self.gpa, .{
+    try self.tokens.append(self.gpa, .{
         .kind = kind,
         .source = self.source_code[0..len],
     });
     self.source_code = self.source_code[len..];
 }
-
-const TokenStream = struct {
-    tokens: std.MultiArrayList(Token) = .{},
-
-    pub fn deinit(self: @This(), gpa: std.mem.Allocator) void {
-        var tokens = self.tokens;
-        tokens.deinit(gpa);
-    }
-};
 
 const Token = struct {
     kind: SyntaxKind,
@@ -243,11 +234,11 @@ test "fuzz lexer" {
     defer string_arena.deinit();
     var diagnostics = Diagnostic.S.init(gpa, string_arena.allocator());
     defer diagnostics.deinit();
-    const tokens = try lex(input_bytes, &diagnostics, gpa);
+    var tokens = try lex(input_bytes, &diagnostics, gpa);
     defer tokens.deinit(gpa);
 
     // Token stream must match input.
-    for (tokens.tokens.items(.source)) |token| {
+    for (tokens.items(.source)) |token| {
         try std.testing.expectStringStartsWith(input_bytes, token);
         input_bytes = input_bytes[token.len..];
     }
