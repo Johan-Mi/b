@@ -63,7 +63,7 @@ fn next(self: *@This()) !?Token {
 }
 
 fn skipTrivia(self: *@This()) !?Token {
-    const State = enum { normal, comment, end_of_comment };
+    const State = enum { normal, start_of_comment, comment, end_of_comment };
 
     var state: State = .normal;
     for (0.., self.source_code) |i, c| {
@@ -71,11 +71,13 @@ fn skipTrivia(self: *@This()) !?Token {
             .normal => {
                 if (std.ascii.isWhitespace(c)) continue;
                 if (std.mem.startsWith(u8, self.source_code[i..], "/*")) {
-                    state = .comment;
+                    state = .start_of_comment;
                     continue;
                 }
                 return if (i == 0) null else self.makeToken(i, .trivia);
             },
+            // Skip the asterisk
+            .start_of_comment => state = .comment,
             .comment => {
                 if (std.mem.startsWith(u8, self.source_code[i..], "*/"))
                     state = .end_of_comment;
