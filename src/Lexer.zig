@@ -4,28 +4,23 @@ const std = @import("std");
 source_code: []const u8,
 diagnostics: *Diagnostic.S,
 
-pub fn lex(
+pub fn init(
     source_code: []const u8,
     diagnostics: *Diagnostic.S,
-    gpa: std.mem.Allocator,
-) !std.MultiArrayList(Token) {
-    var self = @This(){
+) @This() {
+    return .{
         .source_code = source_code,
         .diagnostics = diagnostics,
     };
-
-    var tokens = std.MultiArrayList(Token){};
-    errdefer tokens.deinit(gpa);
-
-    while (try self.next()) |token| {
-        try tokens.append(gpa, token);
-        self.source_code = self.source_code[token.source.len..];
-    }
-
-    return tokens;
 }
 
-fn next(self: *@This()) !?Token {
+pub fn next(self: *@This()) !?Token {
+    const token = try self.nextWithoutConsuming() orelse return null;
+    self.source_code = self.source_code[token.source.len..];
+    return token;
+}
+
+fn nextWithoutConsuming(self: *@This()) !?Token {
     if (try self.skipTrivia()) |trivia| return trivia;
     if (self.source_code.len == 0) return null;
 
@@ -234,13 +229,12 @@ test "fuzz lexer" {
     defer string_arena.deinit();
     var diagnostics = Diagnostic.S.init(gpa, string_arena.allocator());
     defer diagnostics.deinit();
-    var tokens = try lex(input_bytes, &diagnostics, gpa);
-    defer tokens.deinit(gpa);
+    var lexer = init(input_bytes, &diagnostics);
 
     // Token stream must match input.
-    for (tokens.items(.source)) |token| {
-        try std.testing.expectStringStartsWith(input_bytes, token);
-        input_bytes = input_bytes[token.len..];
+    while (try lexer.next()) |token| {
+        try std.testing.expectStringStartsWith(input_bytes, token.source);
+        input_bytes = input_bytes[token.source.len..];
     }
     try std.testing.expectEqualStrings("", input_bytes);
 }
