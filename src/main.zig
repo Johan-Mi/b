@@ -1,5 +1,6 @@
 const Diagnostic = @import("Diagnostic.zig");
 const Lexer = @import("Lexer.zig");
+const Parser = @import("Parser.zig");
 const std = @import("std");
 
 pub fn main() !u8 {
@@ -43,9 +44,13 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     defer allocator.free(source_code);
 
     var lexer = Lexer.init(source_code, diagnostics);
+    var tokens = std.MultiArrayList(Lexer.Token){};
+    defer tokens.deinit(allocator);
     while (try lexer.next()) |token| {
-        std.log.debug("{s} «{s}»", .{ @tagName(token.kind), token.source });
+        try tokens.append(allocator, token);
     }
+
+    _ = Parser.parse(tokens.slice());
 }
 
 test {

@@ -95,12 +95,12 @@ fn makeToken(self: @This(), len: usize, kind: SyntaxKind) Token {
     return .{ .kind = kind, .source = self.source_code[0..len] };
 }
 
-const Token = struct {
+pub const Token = struct {
     kind: SyntaxKind,
     source: []const u8,
 };
 
-const SyntaxKind = enum {
+pub const SyntaxKind = enum {
     kw_auto,
     kw_extrn,
     kw_if,
@@ -180,6 +180,8 @@ const SyntaxKind = enum {
     string_literal,
     character_literal,
     bcd_literal,
+
+    document,
 
     trivia,
     @"error",
