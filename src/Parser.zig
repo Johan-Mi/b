@@ -20,6 +20,29 @@ fn parseTopLevelItem(self: *@This()) void {
     self.@"error"();
 }
 
+fn parseStatement(self: *@This()) void {
+    switch (self.peek()) {
+        .kw_while => self.parseWhile(),
+        else => self.@"error"(),
+    }
+}
+
+fn parseWhile(self: *@This()) void {
+    std.debug.assert(self.at(.kw_while));
+    self.startNode(.@"while");
+    defer self.cst.finishNode();
+
+    self.bump();
+    _ = self.eat(.@"(");
+    self.parseExpression();
+    _ = self.eat(.@")");
+    self.parseStatement();
+}
+
+fn parseExpression(self: *@This()) void {
+    self.@"error"();
+}
+
 fn @"error"(self: *@This()) void {
     self.startNode(.@"error");
     defer self.cst.finishNode();
@@ -43,6 +66,7 @@ fn parseAnything(self: *@This()) void {
             while (!self.at(.eof) and !self.eat(.@"]"))
                 self.parseAnything();
         },
+        .kw_while => self.parseWhile(),
         else => self.bump(),
     }
 }
