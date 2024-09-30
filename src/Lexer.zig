@@ -14,8 +14,8 @@ pub fn next(self: *@This()) ?Token {
 }
 
 fn nextWithoutConsuming(self: *@This()) ?Token {
-    if (self.skipTrivia()) |trivia| return trivia;
     if (self.source_code.len == 0) return null;
+    if (self.skipTrivia()) |trivia| return trivia;
 
     inline for (symbols) |symbol| {
         if (std.mem.startsWith(u8, self.source_code, symbol.text))
@@ -48,8 +48,9 @@ fn nextWithoutConsuming(self: *@This()) ?Token {
 }
 
 fn skipTrivia(self: *@This()) ?Token {
+    std.debug.assert(self.source_code.len != 0);
     var state: enum { normal, start_of_comment, comment, end_of_comment } = .normal;
-    for (0.., self.source_code) |i, c| {
+    return for (0.., self.source_code) |i, c| {
         switch (state) {
             .normal => {
                 if (std.ascii.isWhitespace(c)) continue;
@@ -57,7 +58,7 @@ fn skipTrivia(self: *@This()) ?Token {
                     state = .start_of_comment;
                     continue;
                 }
-                return if (i == 0) null else self.makeToken(i, .trivia);
+                break if (i == 0) null else self.makeToken(i, .trivia);
             },
             // Skip the asterisk
             .start_of_comment => state = .comment,
@@ -68,12 +69,7 @@ fn skipTrivia(self: *@This()) ?Token {
             // Skip the slash
             .end_of_comment => state = .normal,
         }
-    } else {
-        return if (self.source_code.len == 0)
-            null
-        else
-            self.makeToken(self.source_code.len, .trivia);
-    }
+    } else self.makeToken(self.source_code.len, .trivia);
 }
 
 fn makeToken(self: @This(), len: usize, kind: SyntaxKind) Token {
