@@ -48,6 +48,19 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     defer tokens.deinit(allocator);
     while (lexer.next()) |token| {
         try tokens.append(allocator, token);
+        switch (token.kind) {
+            .@"error" => {
+                const message = if (token.source.len == 1) "invalid byte" else "invalid bytes";
+                try diagnostics.@"error"(message);
+            },
+            .string_literal => if (!std.mem.endsWith(u8, token.source, "\""))
+                try diagnostics.@"error"("unterminated string literal"),
+            .character_literal => if (!std.mem.endsWith(u8, token.source, "'"))
+                try diagnostics.@"error"("unterminated character literal"),
+            .bcd_literal => if (!std.mem.endsWith(u8, token.source, "`"))
+                try diagnostics.@"error"("unterminated BCD literal"),
+            else => {},
+        }
     }
 
     _ = Parser.parse(tokens.slice());
