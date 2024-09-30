@@ -43,10 +43,10 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     };
     defer allocator.free(source_code);
 
-    var lexer = Lexer.init(source_code, diagnostics);
+    var lexer = Lexer.init(source_code);
     var tokens = std.MultiArrayList(Lexer.Token){};
     defer tokens.deinit(allocator);
-    while (try lexer.next()) |token| {
+    while (lexer.next()) |token| {
         try tokens.append(allocator, token);
     }
 

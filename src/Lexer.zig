@@ -2,26 +2,19 @@ const Diagnostic = @import("Diagnostic.zig");
 const std = @import("std");
 
 source_code: []const u8,
-diagnostics: *Diagnostic.S,
 
-pub fn init(
-    source_code: []const u8,
-    diagnostics: *Diagnostic.S,
-) @This() {
-    return .{
-        .source_code = source_code,
-        .diagnostics = diagnostics,
-    };
+pub fn init(source_code: []const u8) @This() {
+    return .{ .source_code = source_code };
 }
 
-pub fn next(self: *@This()) !?Token {
-    const token = try self.nextWithoutConsuming() orelse return null;
+pub fn next(self: *@This()) ?Token {
+    const token = self.nextWithoutConsuming() orelse return null;
     self.source_code = self.source_code[token.source.len..];
     return token;
 }
 
-fn nextWithoutConsuming(self: *@This()) !?Token {
-    if (try self.skipTrivia()) |trivia| return trivia;
+fn nextWithoutConsuming(self: *@This()) ?Token {
+    if (self.skipTrivia()) |trivia| return trivia;
     if (self.source_code.len == 0) return null;
 
     inline for (symbols) |symbol| {
@@ -49,15 +42,12 @@ fn nextWithoutConsuming(self: *@This()) !?Token {
         },
         else => {
             const token_len = std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len;
-            std.debug.assert(token_len != 0);
-            const message = if (token_len == 1) "invalid byte" else "invalid bytes";
-            try self.diagnostics.@"error"(message);
             return self.makeToken(token_len, .@"error");
         },
     }
 }
 
-fn skipTrivia(self: *@This()) !?Token {
+fn skipTrivia(self: *@This()) ?Token {
     const State = enum { normal, start_of_comment, comment, end_of_comment };
 
     var state: State = .normal;
@@ -81,8 +71,6 @@ fn skipTrivia(self: *@This()) !?Token {
             .end_of_comment => state = .normal,
         }
     } else {
-        if (state != .normal)
-            try self.diagnostics.@"error"("unterminated comment");
         return if (self.source_code.len == 0)
             null
         else
@@ -226,15 +214,10 @@ fn nonZero(n: anytype) ?@TypeOf(n) {
 
 test "fuzz lexer" {
     var input_bytes = std.testing.fuzzInput(.{});
-    const gpa = std.testing.allocator;
-    var string_arena = std.heap.ArenaAllocator.init(gpa);
-    defer string_arena.deinit();
-    var diagnostics = Diagnostic.S.init(gpa, string_arena.allocator());
-    defer diagnostics.deinit();
-    var lexer = init(input_bytes, &diagnostics);
+    var lexer = init(input_bytes);
 
     // Token stream must match input.
-    while (try lexer.next()) |token| {
+    while (lexer.next()) |token| {
         try std.testing.expectStringStartsWith(input_bytes, token.source);
         input_bytes = input_bytes[token.source.len..];
     }
