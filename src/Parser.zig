@@ -62,7 +62,7 @@ fn startNode(self: *@This(), kind: SyntaxKind) void {
 }
 
 fn skipTrivia(self: *@This()) void {
-    while (!self.at(.eof)) : (self.index += 1) {
+    while (self.index < self.tokens.len) : (self.index += 1) {
         const token = self.tokens.get(self.index);
         if (token.kind != .trivia) break;
         self.cst.token(token.kind, token.source);
@@ -76,10 +76,11 @@ fn eat(self: *@This(), kind: SyntaxKind) bool {
     } else return false;
 }
 
-fn at(self: @This(), kind: SyntaxKind) bool {
+fn at(self: *@This(), kind: SyntaxKind) bool {
     return self.peek() == kind;
 }
 
-fn peek(self: @This()) SyntaxKind {
+fn peek(self: *@This()) SyntaxKind {
+    self.skipTrivia();
     return if (self.index < self.tokens.len) self.tokens.get(self.index).kind else .eof;
 }
