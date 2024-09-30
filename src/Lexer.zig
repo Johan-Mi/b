@@ -1,4 +1,3 @@
-const Diagnostic = @import("Diagnostic.zig");
 const std = @import("std");
 
 source_code: []const u8,
