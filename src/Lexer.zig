@@ -48,9 +48,7 @@ fn nextWithoutConsuming(self: *@This()) ?Token {
 }
 
 fn skipTrivia(self: *@This()) ?Token {
-    const State = enum { normal, start_of_comment, comment, end_of_comment };
-
-    var state: State = .normal;
+    var state: enum { normal, start_of_comment, comment, end_of_comment } = .normal;
     for (0.., self.source_code) |i, c| {
         switch (state) {
             .normal => {
