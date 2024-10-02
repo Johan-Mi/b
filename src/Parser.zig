@@ -108,3 +108,16 @@ fn peek(self: *@This()) SyntaxKind {
     self.skipTrivia();
     return if (self.index < self.tokens.len) self.tokens.get(self.index).kind else .eof;
 }
+
+test "fuzz parser" {
+    const input_bytes = std.testing.fuzzInput(.{});
+    var lexer = @import("Lexer.zig").init(input_bytes);
+    var tokens = std.MultiArrayList(Token){};
+    defer tokens.deinit(std.testing.allocator);
+
+    while (lexer.next()) |token| {
+        try tokens.append(std.testing.allocator, token);
+    }
+
+    _ = parse(tokens.slice());
+}
