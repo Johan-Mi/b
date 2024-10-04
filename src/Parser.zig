@@ -45,9 +45,20 @@ fn parseFunctionParameters(self: *@This()) void {
 
 fn parseStatement(self: *@This()) void {
     switch (self.peek()) {
+        .@"{" => self.parseCompoundStatement(),
         .kw_while => self.parseWhile(),
         else => self.@"error"(),
     }
+}
+
+fn parseCompoundStatement(self: *@This()) void {
+    std.debug.assert(self.at(.@"{"));
+    self.startNode(.compound_statement);
+    defer self.cst.finishNode();
+
+    self.bump();
+    while (!self.at(.eof) and !self.eat(.@"}"))
+        self.parseStatement();
 }
 
 fn parseWhile(self: *@This()) void {

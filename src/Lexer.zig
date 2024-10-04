@@ -165,6 +165,7 @@ pub const SyntaxKind = enum {
     document,
     function,
     function_parameters,
+    compound_statement,
     @"while",
 
     trivia,
