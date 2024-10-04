@@ -143,7 +143,7 @@ fn peek(self: *@This()) SyntaxKind {
     return if (self.index < self.tokens.len) self.tokens.get(self.index).kind else .eof;
 }
 
-fn peekNth(self: *@This(), n: usize) SyntaxKind {
+fn peekNth(self: @This(), n: usize) SyntaxKind {
     var i: usize = 0;
     return for (self.tokens.items(.kind)[self.index..]) |kind| {
         if (kind == .trivia) continue;
