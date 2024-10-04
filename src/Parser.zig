@@ -17,7 +17,30 @@ pub fn parse(tokens: std.MultiArrayList(Token).Slice) Cst {
 }
 
 fn parseTopLevelItem(self: *@This()) void {
-    self.@"error"();
+    if (self.at(.identifier) and self.peekNth(1) == .@"(")
+        self.parseFunction()
+    else
+        self.@"error"();
+}
+
+fn parseFunction(self: *@This()) void {
+    std.debug.assert(self.at(.identifier));
+    self.startNode(.function);
+    defer self.cst.finishNode();
+
+    self.bump();
+    self.parseFunctionParameters();
+    self.parseStatement();
+}
+
+fn parseFunctionParameters(self: *@This()) void {
+    std.debug.assert(self.at(.@"("));
+    self.startNode(.function_parameters);
+    defer self.cst.finishNode();
+
+    self.bump();
+    while (!self.at(.eof) and !self.eat(.@")"))
+        self.@"error"();
 }
 
 fn parseStatement(self: *@This()) void {
@@ -107,6 +130,15 @@ fn at(self: *@This(), kind: SyntaxKind) bool {
 fn peek(self: *@This()) SyntaxKind {
     self.skipTrivia();
     return if (self.index < self.tokens.len) self.tokens.get(self.index).kind else .eof;
+}
+
+fn peekNth(self: *@This(), n: usize) SyntaxKind {
+    var i: usize = 0;
+    return for (self.tokens.items(.kind)[self.index..]) |kind| {
+        if (kind == .trivia) continue;
+        if (i == n) break kind;
+        i += 1;
+    } else .eof;
 }
 
 test "fuzz parser" {

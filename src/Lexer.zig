@@ -163,6 +163,8 @@ pub const SyntaxKind = enum {
     bcd_literal,
 
     document,
+    function,
+    function_parameters,
     @"while",
 
     trivia,
