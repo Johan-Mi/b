@@ -138,9 +138,10 @@ fn at(self: *@This(), kind: SyntaxKind) bool {
     return self.peek() == kind;
 }
 
-fn peek(self: *@This()) SyntaxKind {
-    self.skipTrivia();
-    return if (self.index < self.tokens.len) self.tokens.get(self.index).kind else .eof;
+fn peek(self: @This()) SyntaxKind {
+    const kinds = self.tokens.items(.kind);
+    const index = std.mem.indexOfNonePos(SyntaxKind, kinds, self.index, &.{.trivia}) orelse return .eof;
+    return kinds[index];
 }
 
 fn peekNth(self: @This(), n: usize) SyntaxKind {
