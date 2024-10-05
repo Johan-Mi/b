@@ -46,6 +46,8 @@ fn parseFunctionParameters(self: *@This()) void {
 fn parseStatement(self: *@This()) void {
     switch (self.peek()) {
         .@"{" => self.parseCompoundStatement(),
+        .kw_auto => self.parseAuto(),
+        .kw_extrn => self.parseExtrn(),
         .kw_while => self.parseWhile(),
         else => self.@"error"(),
     }
@@ -59,6 +61,42 @@ fn parseCompoundStatement(self: *@This()) void {
     self.bump();
     while (!self.at(.eof) and !self.eat(.@"}"))
         self.parseStatement();
+}
+
+fn parseAuto(self: *@This()) void {
+    std.debug.assert(self.at(.kw_auto));
+    self.startNode(.auto);
+    defer self.cst.finishNode();
+
+    self.bump();
+    while (true) {
+        switch (self.peek()) {
+            .identifier, .@"," => self.bump(),
+            .@";" => {
+                self.bump();
+                break;
+            },
+            else => break,
+        }
+    }
+}
+
+fn parseExtrn(self: *@This()) void {
+    std.debug.assert(self.at(.kw_extrn));
+    self.startNode(.extrn);
+    defer self.cst.finishNode();
+
+    self.bump();
+    while (true) {
+        switch (self.peek()) {
+            .identifier, .@"," => self.bump(),
+            .@";" => {
+                self.bump();
+                break;
+            },
+            else => break,
+        }
+    }
 }
 
 fn parseWhile(self: *@This()) void {
@@ -100,6 +138,8 @@ fn parseAnything(self: *@This()) void {
             while (!self.at(.eof) and !self.eat(.@"]"))
                 self.parseAnything();
         },
+        .kw_auto => self.parseAuto(),
+        .kw_extrn => self.parseExtrn(),
         .kw_while => self.parseWhile(),
         else => self.bump(),
     }
