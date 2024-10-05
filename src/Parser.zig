@@ -126,9 +126,18 @@ fn parseWhile(self: *@This()) void {
 
 fn parseExpression(self: *@This()) void {
     switch (self.peek()) {
+        .identifier => self.parseVariable(),
         .@"(" => self.parseParenthesizedExpression(),
         else => self.@"error"(),
     }
+}
+
+fn parseVariable(self: *@This()) void {
+    std.debug.assert(self.at(.identifier));
+    self.startNode(.variable);
+    defer self.cst.finishNode();
+
+    self.bump();
 }
 
 fn parseParenthesizedExpression(self: *@This()) void {
