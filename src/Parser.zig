@@ -125,6 +125,10 @@ fn parseWhile(self: *@This()) void {
 }
 
 fn parseExpression(self: *@This()) void {
+    self.parseExpressionRecursively(0);
+}
+
+fn parseAtom(self: *@This()) void {
     switch (self.peek()) {
         .identifier => self.parseVariable(),
         .@"(" => self.parseParenthesizedExpression(),
@@ -148,6 +152,90 @@ fn parseParenthesizedExpression(self: *@This()) void {
     self.bump();
     self.parseExpression();
     _ = self.eat(.@")");
+}
+
+fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
+    if (prefixBindingPower(self.peek())) |bp_right| {
+        self.bump();
+        @call(.always_tail, parseExpressionRecursively, .{ self, bp_right });
+    } else {
+        self.parseAtom();
+        while (true) {
+            const op = self.peek();
+            if (postfixBindingPower(op)) |bp_left| {
+                if (bp_left < bp_min) break;
+                self.bump();
+            } else if (infixBindingPower(op)) |bp| {
+                if (bp.left < bp_min) break;
+                self.bump();
+                self.parseExpressionRecursively(bp.right);
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+const BindingPower = u2;
+
+fn prefixBindingPower(kind: SyntaxKind) ?BindingPower {
+    return switch (kind) {
+        .@"#", .@"##", .@"~", .@"-", .@"#-", .@"!", .@"*", .@"&", .@"++", .@"--", .@"@" => 1,
+        else => null,
+    };
+}
+
+fn postfixBindingPower(kind: SyntaxKind) ?BindingPower {
+    return switch (kind) {
+        .@"++", .@"--" => 1,
+        else => null,
+    };
+}
+
+fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: BindingPower } {
+    return switch (kind) {
+        .@"<<",
+        .@">>",
+        .@"&",
+        .@"|",
+        .@"^",
+        .@"*",
+        .@"/",
+        .@"%",
+        .@"#*",
+        .@"#/",
+        .@"+",
+        .@"-",
+        .@"#+",
+        .@"#-",
+        .@"==",
+        .@"!=",
+        .@"<",
+        .@"<=",
+        .@">",
+        .@">=",
+        .@"#==",
+        .@"#!=",
+        .@"#<",
+        .@"#<=",
+        .@"#>",
+        .@"#>=",
+        .@"&&",
+        .@"||",
+        .@"=",
+        .@"*=",
+        .@"/=",
+        .@"%=",
+        .@"+=",
+        .@"-=",
+        .@"<<=",
+        .@">>=",
+        .@"&=",
+        .@"^=",
+        .@"|=",
+        => .{ .left = 1, .right = 2 },
+        else => null,
+    };
 }
 
 fn @"error"(self: *@This()) void {
