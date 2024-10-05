@@ -112,7 +112,20 @@ fn parseWhile(self: *@This()) void {
 }
 
 fn parseExpression(self: *@This()) void {
-    self.@"error"();
+    switch (self.peek()) {
+        .@"(" => self.parseParenthesizedExpression(),
+        else => self.@"error"(),
+    }
+}
+
+fn parseParenthesizedExpression(self: *@This()) void {
+    std.debug.assert(self.at(.@"("));
+    self.startNode(.parenthesized_expression);
+    defer self.cst.finishNode();
+
+    self.bump();
+    self.parseExpression();
+    _ = self.eat(.@")");
 }
 
 fn @"error"(self: *@This()) void {
