@@ -9,9 +9,14 @@ pub const S = struct {
     diagnostics: std.MultiArrayList(Diagnostic) = .{},
     gpa: std.mem.Allocator,
     string_arena: std.mem.Allocator,
+    config: std.io.tty.Config,
 
     pub fn init(gpa: std.mem.Allocator, string_arena: std.mem.Allocator) @This() {
-        return .{ .gpa = gpa, .string_arena = string_arena };
+        return .{
+            .gpa = gpa,
+            .string_arena = string_arena,
+            .config = std.io.tty.detectConfig(std.io.getStdErr()),
+        };
     }
 
     pub fn format(self: *@This(), comptime fmt: []const u8, args: anytype) ![]const u8 {
@@ -29,8 +34,17 @@ pub const S = struct {
     pub fn show(self: @This()) !void {
         const writer = std.io.getStdErr().writer();
         for (self.diagnostics.items(.level), self.diagnostics.items(.message)) |level, message| {
-            try writer.print("{s}: {s}\n", .{ @tagName(level), message });
+            try self.config.setColor(writer, .bold);
+            try self.config.setColor(writer, switch (level) {
+                .note => .blue,
+                .@"error" => .red,
+            });
+            try writer.print("{s}", .{@tagName(level)});
+            try self.config.setColor(writer, .reset);
+            try self.config.setColor(writer, .bold);
+            try writer.print(": {s}\n", .{message});
         }
+        try self.config.setColor(writer, .reset);
     }
 
     pub fn is_ok(self: @This()) bool {
