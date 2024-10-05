@@ -36,7 +36,7 @@ pub const S = struct {
         for (self.diagnostics.items(.level), self.diagnostics.items(.message)) |level, message| {
             try self.config.setColor(writer, .bold);
             try self.config.setColor(writer, switch (level) {
-                .note => .blue,
+                .note => .green,
                 .@"error" => .red,
             });
             try writer.print("{s}", .{@tagName(level)});
