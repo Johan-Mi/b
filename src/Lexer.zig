@@ -168,6 +168,7 @@ pub const SyntaxKind = enum {
     compound_statement,
     auto,
     extrn,
+    @"if",
     @"while",
     parenthesized_expression,
 

@@ -48,6 +48,7 @@ fn parseStatement(self: *@This()) void {
         .@"{" => self.parseCompoundStatement(),
         .kw_auto => self.parseAuto(),
         .kw_extrn => self.parseExtrn(),
+        .kw_if => self.parseIf(),
         .kw_while => self.parseWhile(),
         else => self.@"error"(),
     }
@@ -97,6 +98,18 @@ fn parseExtrn(self: *@This()) void {
             else => break,
         }
     }
+}
+
+fn parseIf(self: *@This()) void {
+    std.debug.assert(self.at(.kw_if));
+    self.startNode(.@"if");
+    defer self.cst.finishNode();
+
+    self.bump();
+    _ = self.eat(.@"(");
+    self.parseExpression();
+    _ = self.eat(.@")");
+    self.parseStatement();
 }
 
 fn parseWhile(self: *@This()) void {
@@ -153,6 +166,7 @@ fn parseAnything(self: *@This()) void {
         },
         .kw_auto => self.parseAuto(),
         .kw_extrn => self.parseExtrn(),
+        .kw_if => self.parseIf(),
         .kw_while => self.parseWhile(),
         else => self.bump(),
     }
