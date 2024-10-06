@@ -172,6 +172,7 @@ pub const SyntaxKind = enum {
     @"while",
     variable,
     parenthesized_expression,
+    prefix_operation,
 
     trivia,
     @"error",

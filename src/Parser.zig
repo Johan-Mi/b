@@ -156,8 +156,10 @@ fn parseParenthesizedExpression(self: *@This()) void {
 
 fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
     if (prefixBindingPower(self.peek())) |bp_right| {
+        self.startNode(.prefix_operation);
+        defer self.cst.finishNode();
         self.bump();
-        @call(.always_tail, parseExpressionRecursively, .{ self, bp_right });
+        self.parseExpressionRecursively(bp_right);
     } else {
         self.parseAtom();
         while (true) {
