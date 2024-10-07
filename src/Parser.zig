@@ -50,7 +50,7 @@ fn parseStatement(self: *@This()) void {
         .kw_extrn => self.parseExtrn(),
         .kw_if => self.parseIf(),
         .kw_while => self.parseWhile(),
-        else => self.@"error"(),
+        else => self.parseExpressionStatement(),
     }
 }
 
@@ -122,6 +122,14 @@ fn parseWhile(self: *@This()) void {
     self.parseExpression();
     _ = self.eat(.@")");
     self.parseStatement();
+}
+
+fn parseExpressionStatement(self: *@This()) void {
+    self.startNode(.expression_statement);
+    defer self.cst.finishNode();
+
+    self.parseExpression();
+    _ = self.eat(.@";");
 }
 
 fn parseExpression(self: *@This()) void {
