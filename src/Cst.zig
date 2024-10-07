@@ -1,4 +1,4 @@
-const SyntaxKind = @import("Lexer.zig").SyntaxKind;
+const SyntaxKind = @import("syntax.zig").Kind;
 const log = @import("std").log.scoped(.cst);
 
 indent: usize = 0,

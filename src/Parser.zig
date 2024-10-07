@@ -1,6 +1,6 @@
 const Cst = @import("Cst.zig");
 const std = @import("std");
-const SyntaxKind = @import("Lexer.zig").SyntaxKind;
+const SyntaxKind = @import("syntax.zig").Kind;
 const Token = @import("Lexer.zig").Token;
 
 tokens: std.MultiArrayList(Token).Slice,
