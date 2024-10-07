@@ -139,6 +139,11 @@ fn parseExpression(self: *@This()) void {
 fn parseAtom(self: *@This()) void {
     switch (self.peek()) {
         .identifier => self.parseVariable(),
+        .number, .string_literal, .character_literal, .bcd_literal => {
+            self.startNode(.literal);
+            defer self.cst.finishNode();
+            self.bump();
+        },
         .@"(" => self.parseParenthesizedExpression(),
         else => self.@"error"(),
     }
