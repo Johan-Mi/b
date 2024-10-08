@@ -187,6 +187,10 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
             } else if (infixBindingPower(op)) |bp| {
                 if (bp.left < bp_min) break;
                 self.bump();
+                if (op == .@"?") {
+                    self.parseExpression();
+                    _ = self.eat(.@":");
+                }
                 self.parseExpressionRecursively(bp.right);
             } else {
                 break;
@@ -252,6 +256,7 @@ fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: Bind
         .@"&=",
         .@"^=",
         .@"|=",
+        .@"?",
         => .{ .left = 1, .right = 2 },
         else => null,
     };
