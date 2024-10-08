@@ -180,6 +180,10 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
             if (postfixBindingPower(op)) |bp_left| {
                 if (bp_left < bp_min) break;
                 self.bump();
+                if (op == .@"[") {
+                    self.parseExpression();
+                    _ = self.eat(.@"]");
+                }
             } else if (infixBindingPower(op)) |bp| {
                 if (bp.left < bp_min) break;
                 self.bump();
@@ -202,7 +206,7 @@ fn prefixBindingPower(kind: SyntaxKind) ?BindingPower {
 
 fn postfixBindingPower(kind: SyntaxKind) ?BindingPower {
     return switch (kind) {
-        .@"++", .@"--" => 1,
+        .@"++", .@"--", .@"[" => 1,
         else => null,
     };
 }
