@@ -199,38 +199,40 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
     }
 }
 
-const BindingPower = u2;
+const BindingPower = u5;
 
 fn prefixBindingPower(kind: SyntaxKind) ?BindingPower {
     return switch (kind) {
-        .@"#", .@"##", .@"~", .@"-", .@"#-", .@"!", .@"*", .@"&", .@"++", .@"--", .@"@" => 1,
+        .@"#", .@"##", .@"~", .@"-", .@"#-", .@"!", .@"*", .@"&", .@"++", .@"--", .@"@" => 23,
         else => null,
     };
 }
 
 fn postfixBindingPower(kind: SyntaxKind) ?BindingPower {
     return switch (kind) {
-        .@"++", .@"--", .@"[" => 1,
+        .@"++", .@"--" => 23,
+        .@"[" => 25,
         else => null,
     };
 }
 
 fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: BindingPower } {
     return switch (kind) {
-        .@"<<",
-        .@">>",
-        .@"&",
-        .@"|",
-        .@"^",
-        .@"*",
-        .@"/",
-        .@"%",
-        .@"#*",
-        .@"#/",
-        .@"+",
-        .@"-",
-        .@"#+",
-        .@"#-",
+        .@"=",
+        .@"*=",
+        .@"/=",
+        .@"%=",
+        .@"+=",
+        .@"-=",
+        .@"<<=",
+        .@">>=",
+        .@"&=",
+        .@"^=",
+        .@"|=",
+        => .{ .left = 2, .right = 1 },
+        .@"?" => .{ .left = 4, .right = 3 },
+        .@"||" => .{ .left = 5, .right = 6 },
+        .@"&&" => .{ .left = 7, .right = 8 },
         .@"==",
         .@"!=",
         .@"<",
@@ -243,21 +245,24 @@ fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: Bind
         .@"#<=",
         .@"#>",
         .@"#>=",
-        .@"&&",
-        .@"||",
-        .@"=",
-        .@"*=",
-        .@"/=",
-        .@"%=",
-        .@"+=",
-        .@"-=",
-        .@"<<=",
-        .@">>=",
-        .@"&=",
-        .@"^=",
-        .@"|=",
-        .@"?",
-        => .{ .left = 1, .right = 2 },
+        => .{ .left = 9, .right = 10 },
+        .@"+",
+        .@"-",
+        .@"#+",
+        .@"#-",
+        => .{ .left = 11, .right = 12 },
+        .@"*",
+        .@"/",
+        .@"%",
+        .@"#*",
+        .@"#/",
+        => .{ .left = 13, .right = 14 },
+        .@"|" => .{ .left = 15, .right = 16 },
+        .@"^" => .{ .left = 17, .right = 18 },
+        .@"&" => .{ .left = 19, .right = 20 },
+        .@"<<",
+        .@">>",
+        => .{ .left = 21, .right = 22 },
         else => null,
     };
 }
