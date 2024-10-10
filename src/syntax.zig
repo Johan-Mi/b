@@ -92,6 +92,8 @@ pub const Kind = enum {
     literal,
     parenthesized_expression,
     prefix_operation,
+    postfix_operation,
+    infix_operation,
 
     trivia,
     @"error",

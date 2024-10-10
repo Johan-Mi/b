@@ -168,6 +168,8 @@ fn parseParenthesizedExpression(self: *@This()) void {
 }
 
 fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
+    const checkpoint = self.makeCheckpoint();
+
     if (prefixBindingPower(self.peek())) |bp_right| {
         self.startNode(.prefix_operation);
         defer self.cst.finishNode();
@@ -179,6 +181,10 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
             const op = self.peek();
             if (postfixBindingPower(op)) |bp_left| {
                 if (bp_left < bp_min) break;
+
+                self.cst.startNodeAt(checkpoint, .postfix_operation);
+                defer self.cst.finishNode();
+
                 self.bump();
                 if (op == .@"[") {
                     self.parseExpression();
@@ -186,6 +192,10 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
                 }
             } else if (infixBindingPower(op)) |bp| {
                 if (bp.left < bp_min) break;
+
+                self.cst.startNodeAt(checkpoint, .infix_operation);
+                defer self.cst.finishNode();
+
                 self.bump();
                 if (op == .@"?") {
                     self.parseExpression();
@@ -310,6 +320,11 @@ fn bump(self: *@This()) void {
 fn startNode(self: *@This(), kind: SyntaxKind) void {
     self.skipTrivia();
     self.cst.startNode(kind);
+}
+
+fn makeCheckpoint(self: *@This()) Cst.Checkpoint {
+    self.skipTrivia();
+    return self.cst.makeCheckpoint();
 }
 
 fn skipTrivia(self: *@This()) void {
