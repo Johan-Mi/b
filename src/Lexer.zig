@@ -124,7 +124,7 @@ test "fuzz lexer" {
 
     // Token stream must match input.
     while (lexer.next()) |token| {
-        try std.testing.expectStringStartsWith(input_bytes, token.source);
+        try std.testing.expectEqual(input_bytes.ptr, token.source.ptr);
         input_bytes = input_bytes[token.source.len..];
     }
     try std.testing.expectEqualStrings("", input_bytes);
