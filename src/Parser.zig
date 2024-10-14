@@ -45,6 +45,7 @@ fn parseFunctionParameters(self: *@This()) void {
 
 fn parseStatement(self: *@This()) void {
     switch (self.peek()) {
+        .@";" => self.parseNullStatement(),
         .@"{" => self.parseCompoundStatement(),
         .kw_auto => self.parseAuto(),
         .kw_extrn => self.parseExtrn(),
@@ -52,6 +53,14 @@ fn parseStatement(self: *@This()) void {
         .kw_while => self.parseWhile(),
         else => self.parseExpressionStatement(),
     }
+}
+
+fn parseNullStatement(self: *@This()) void {
+    std.debug.assert(self.at(.@";"));
+    self.startNode(.null_statement);
+    defer self.cst.finishNode();
+
+    self.bump();
 }
 
 fn parseCompoundStatement(self: *@This()) void {
@@ -300,6 +309,7 @@ fn parseAnything(self: *@This()) void {
             while (!self.at(.eof) and !self.eat(.@"]"))
                 self.parseAnything();
         },
+        .@";" => self.parseNullStatement(),
         .kw_auto => self.parseAuto(),
         .kw_extrn => self.parseExtrn(),
         .kw_if => self.parseIf(),

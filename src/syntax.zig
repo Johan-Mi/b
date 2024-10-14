@@ -82,6 +82,7 @@ pub const Kind = enum {
     document,
     function,
     function_parameters,
+    null_statement,
     compound_statement,
     auto,
     extrn,
