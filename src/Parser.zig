@@ -207,36 +207,35 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
         defer self.cst.finishNode();
         self.bump();
         self.parseExpressionRecursively(bp_right);
-    } else {
-        self.parseAtom();
-        while (true) {
-            const op = self.peek();
-            if (postfixBindingPower(op)) |bp_left| {
-                if (bp_left < bp_min) break;
+    } else self.parseAtom();
 
-                self.cst.startNodeAt(checkpoint, .postfix_operation);
-                defer self.cst.finishNode();
+    while (true) {
+        const op = self.peek();
+        if (postfixBindingPower(op)) |bp_left| {
+            if (bp_left < bp_min) break;
 
-                self.bump();
-                if (op == .@"[") {
-                    self.parseExpression();
-                    _ = self.eat(.@"]");
-                }
-            } else if (infixBindingPower(op)) |bp| {
-                if (bp.left < bp_min) break;
+            self.cst.startNodeAt(checkpoint, .postfix_operation);
+            defer self.cst.finishNode();
 
-                self.cst.startNodeAt(checkpoint, .infix_operation);
-                defer self.cst.finishNode();
-
-                self.bump();
-                if (op == .@"?") {
-                    self.parseExpression();
-                    _ = self.eat(.@":");
-                }
-                self.parseExpressionRecursively(bp.right);
-            } else {
-                break;
+            self.bump();
+            if (op == .@"[") {
+                self.parseExpression();
+                _ = self.eat(.@"]");
             }
+        } else if (infixBindingPower(op)) |bp| {
+            if (bp.left < bp_min) break;
+
+            self.cst.startNodeAt(checkpoint, .infix_operation);
+            defer self.cst.finishNode();
+
+            self.bump();
+            if (op == .@"?") {
+                self.parseExpression();
+                _ = self.eat(.@":");
+            }
+            self.parseExpressionRecursively(bp.right);
+        } else {
+            break;
         }
     }
 }
