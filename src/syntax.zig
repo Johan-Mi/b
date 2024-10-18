@@ -92,6 +92,8 @@ pub const Kind = enum {
     variable,
     literal,
     parenthesized_expression,
+    function_call,
+    arguments,
     prefix_operation,
     postfix_operation,
     infix_operation,

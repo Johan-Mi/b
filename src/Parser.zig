@@ -147,7 +147,10 @@ fn parseExpression(self: *@This()) void {
 
 fn parseAtom(self: *@This()) void {
     switch (self.peek()) {
-        .identifier => self.parseVariable(),
+        .identifier => if (self.peekNth(1) == .@"(")
+            self.parseFunctionCall()
+        else
+            self.parseVariable(),
         .number, .string_literal, .character_literal, .bcd_literal => {
             self.startNode(.literal);
             defer self.cst.finishNode();
@@ -174,6 +177,25 @@ fn parseParenthesizedExpression(self: *@This()) void {
     self.bump();
     self.parseExpression();
     _ = self.eat(.@")");
+}
+
+fn parseFunctionCall(self: *@This()) void {
+    std.debug.assert(self.at(.identifier));
+    self.startNode(.function_call);
+    defer self.cst.finishNode();
+
+    self.bump();
+
+    std.debug.assert(self.at(.@"("));
+    self.startNode(.arguments);
+    defer self.cst.finishNode();
+
+    while (!self.at(.eof) and !self.eat(.@")")) {
+        switch (self.peek()) {
+            .@"," => self.bump(),
+            else => self.parseExpression(),
+        }
+    }
 }
 
 fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
