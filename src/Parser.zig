@@ -190,6 +190,7 @@ fn parseFunctionCall(self: *@This()) void {
     self.startNode(.arguments);
     defer self.cst.finishNode();
 
+    self.bump();
     while (!self.at(.eof) and !self.eat(.@")")) {
         switch (self.peek()) {
             .@"," => self.bump(),
