@@ -80,6 +80,9 @@ pub const Kind = enum {
     bcd_literal,
 
     document,
+    global_declaration,
+    vector_size,
+    vector_initializer,
     function,
     function_parameters,
     null_statement,

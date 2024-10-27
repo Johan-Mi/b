@@ -17,10 +17,50 @@ pub fn parse(tokens: std.MultiArrayList(Token).Slice) Cst {
 }
 
 fn parseTopLevelItem(self: *@This()) void {
-    if (self.at(.identifier) and self.peekNth(1) == .@"(")
-        self.parseFunction()
-    else
-        self.@"error"();
+    if (!self.at(.identifier))
+        self.@"error"()
+    else switch (self.peekNth(1)) {
+        .@"(" => self.parseFunction(),
+        .@";", .@"{", .@"[" => self.parseGlobalDeclaration(),
+        else => self.@"error"(),
+    }
+}
+
+fn parseGlobalDeclaration(self: *@This()) void {
+    std.debug.assert(self.at(.identifier));
+    self.startNode(.global_declaration);
+    defer self.cst.finishNode();
+
+    self.bump();
+
+    if (self.at(.@"[")) {
+        self.startNode(.vector_size);
+        defer self.cst.finishNode();
+
+        self.bump();
+
+        if (!self.eat(.@"]")) {
+            self.parseExpression();
+            _ = self.eat(.@"]");
+        }
+    }
+
+    if (self.at(.@"{")) {
+        self.startNode(.vector_initializer);
+        defer self.cst.finishNode();
+
+        self.bump();
+
+        while (!self.at(.eof) and !self.eat(.@"}")) {
+            switch (self.peek()) {
+                .@";" => break,
+                .@"," => self.bump(),
+                else => self.parseExpression(),
+            }
+        }
+    }
+
+    _ = self.eat(.@";");
 }
 
 fn parseFunction(self: *@This()) void {
