@@ -16,7 +16,7 @@ pub fn main() !u8 {
     realMain(allocator, &diagnostics) catch |err| try diagnostics.emit(.@"error"(@errorName(err)));
 
     try diagnostics.show();
-    return @intFromBool(!diagnostics.is_ok());
+    return @intFromBool(!diagnostics.isOk());
 }
 
 fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {

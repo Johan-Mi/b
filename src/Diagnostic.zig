@@ -63,7 +63,7 @@ pub const S = struct {
         try self.config.setColor(writer, .reset);
     }
 
-    pub fn is_ok(self: @This()) bool {
+    pub fn isOk(self: @This()) bool {
         return std.mem.indexOfScalar(Level, self.diagnostics.items(.level), .@"error") == null;
     }
 
