@@ -4,6 +4,7 @@ const Diagnostic = @This();
 
 level: Level,
 message: []const u8,
+span: ?[]const u8 = null,
 
 pub fn note(message: []const u8) @This() {
     return .{ .level = .note, .message = message };
@@ -18,6 +19,8 @@ pub const S = struct {
     gpa: std.mem.Allocator,
     string_arena: std.mem.Allocator,
     config: std.io.tty.Config,
+    /// Must be assigned if any diagnostics have spans.
+    source_code_start: [*]const u8 = undefined,
 
     pub fn init(gpa: std.mem.Allocator, string_arena: std.mem.Allocator) @This() {
         return .{
@@ -37,7 +40,12 @@ pub const S = struct {
 
     pub fn show(self: @This()) !void {
         const writer = std.io.getStdErr().writer();
-        for (self.diagnostics.items(.level), self.diagnostics.items(.message)) |level, message| {
+        const slice = self.diagnostics.slice();
+        for (
+            slice.items(.level),
+            slice.items(.message),
+            slice.items(.span),
+        ) |level, message, maybe_span| {
             try self.config.setColor(writer, .bold);
             try self.config.setColor(writer, switch (level) {
                 .note => .green,
@@ -45,6 +53,10 @@ pub const S = struct {
             });
             try writer.print("{s}", .{@tagName(level)});
             try self.config.setColor(writer, .reset);
+            if (maybe_span) |span| {
+                const start = span.ptr - self.source_code_start;
+                try writer.print(" ({}..{})", .{ start, start + span.len });
+            }
             try self.config.setColor(writer, .bold);
             try writer.print(": {s}\n", .{message});
         }
