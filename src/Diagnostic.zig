@@ -5,6 +5,14 @@ const Diagnostic = @This();
 level: Level,
 message: []const u8,
 
+pub fn note(message: []const u8) @This() {
+    return .{ .level = .note, .message = message };
+}
+
+pub fn @"error"(message: []const u8) @This() {
+    return .{ .level = .@"error", .message = message };
+}
+
 pub const S = struct {
     diagnostics: std.MultiArrayList(Diagnostic) = .{},
     gpa: std.mem.Allocator,
@@ -23,12 +31,8 @@ pub const S = struct {
         return try std.fmt.allocPrint(self.string_arena, fmt, args);
     }
 
-    pub fn note(self: *@This(), message: []const u8) !void {
-        try self.diagnostics.append(self.gpa, .{ .level = .note, .message = message });
-    }
-
-    pub fn @"error"(self: *@This(), message: []const u8) !void {
-        try self.diagnostics.append(self.gpa, .{ .level = .@"error", .message = message });
+    pub fn emit(self: *@This(), diagnostic: Diagnostic) !void {
+        try self.diagnostics.append(self.gpa, diagnostic);
     }
 
     pub fn show(self: @This()) !void {

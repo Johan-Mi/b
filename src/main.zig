@@ -13,7 +13,7 @@ pub fn main() !u8 {
     var diagnostics = Diagnostic.S.init(allocator, string_arena.allocator());
     defer diagnostics.deinit();
 
-    realMain(allocator, &diagnostics) catch |err| try diagnostics.@"error"(@errorName(err));
+    realMain(allocator, &diagnostics) catch |err| try diagnostics.emit(.@"error"(@errorName(err)));
 
     try diagnostics.show();
     return @intFromBool(!diagnostics.is_ok());
@@ -27,17 +27,17 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         const me = if (1 <= args.len) args[0] else "b";
         if (args.len != 2) {
             if (args.len < 2)
-                try diagnostics.@"error"("no source file provided");
+                try diagnostics.emit(.@"error"("no source file provided"));
             if (3 <= args.len)
-                try diagnostics.@"error"("too many command line arguments");
+                try diagnostics.emit(.@"error"("too many command line arguments"));
             const usage = try diagnostics.format("usage: {s} SOURCE.b", .{me});
-            return try diagnostics.note(usage);
+            return try diagnostics.emit(.note(usage));
         }
         const source_path = args[1];
 
         break :blk std.fs.cwd().readFileAlloc(allocator, source_path, std.math.maxInt(usize)) catch |err| {
-            try diagnostics.@"error"("failed to read source code");
-            try diagnostics.note(@errorName(err));
+            try diagnostics.emit(.@"error"("failed to read source code"));
+            try diagnostics.emit(.note(@errorName(err)));
             return;
         };
     };
@@ -51,14 +51,14 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         switch (token.kind) {
             .@"error" => {
                 const message = if (token.source.len == 1) "invalid byte" else "invalid bytes";
-                try diagnostics.@"error"(message);
+                try diagnostics.emit(.@"error"(message));
             },
             .string_literal => if (!std.mem.endsWith(u8, token.source, "\""))
-                try diagnostics.@"error"("unterminated string literal"),
+                try diagnostics.emit(.@"error"("unterminated string literal")),
             .character_literal => if (!std.mem.endsWith(u8, token.source, "'"))
-                try diagnostics.@"error"("unterminated character literal"),
+                try diagnostics.emit(.@"error"("unterminated character literal")),
             .bcd_literal => if (!std.mem.endsWith(u8, token.source, "`"))
-                try diagnostics.@"error"("unterminated BCD literal"),
+                try diagnostics.emit(.@"error"("unterminated BCD literal")),
             else => {},
         }
     }
