@@ -5,7 +5,24 @@ indent: usize = 0,
 
 const indent_width = 2;
 
-pub const Node = struct {};
+pub const Node = struct {
+    pub fn kind(self: @This()) SyntaxKind {
+        _ = self; // autofix
+        @panic("");
+    }
+
+    pub fn children(self: @This()) ChildIterator {
+        _ = self; // autofix
+        return .{};
+    }
+
+    pub const ChildIterator = struct {
+        pub fn next(self: *@This()) ?Node {
+            _ = self; // autofix
+            return null;
+        }
+    };
+};
 
 pub const Token = struct {};
 
