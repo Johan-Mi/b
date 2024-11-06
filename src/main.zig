@@ -75,7 +75,12 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         }
     }
 
-    _ = Parser.parse(tokens.slice());
+    const cst = blk: {
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
+        break :blk try Parser.parse(tokens.slice(), arena.allocator());
+    };
+    defer cst.deinit(allocator);
 }
 
 test {

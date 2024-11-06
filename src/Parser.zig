@@ -5,275 +5,292 @@ const Token = @import("Lexer.zig").Token;
 
 tokens: std.MultiArrayList(Token).Slice,
 index: usize = 0,
-cst: Cst,
+cst: Cst.Builder,
 
-pub fn parse(tokens: std.MultiArrayList(Token).Slice) Cst {
-    var self = @This(){ .tokens = tokens, .cst = Cst.init() };
-    self.cst.startNode(.document);
+pub fn parse(tokens: std.MultiArrayList(Token).Slice, arena: std.mem.Allocator) !Cst {
+    var self = @This(){ .tokens = tokens, .cst = .init(arena) };
+    try self.cst.startNode(.document);
     while (!self.at(.eof))
-        self.parseTopLevelItem();
-    self.cst.finishNode();
-    return self.cst;
+        try self.parseTopLevelItem();
+    try self.cst.finishNode();
+    return self.cst.finish();
 }
 
-fn parseTopLevelItem(self: *@This()) void {
+fn parseTopLevelItem(self: *@This()) !void {
     if (!self.at(.identifier))
-        self.@"error"()
+        try self.@"error"()
     else switch (self.peekNth(1)) {
-        .@"(" => self.parseFunction(),
-        .@";", .@"{", .@"[" => self.parseGlobalDeclaration(),
-        else => self.@"error"(),
+        .@"(" => try self.parseFunction(),
+        .@";", .@"{", .@"[" => try self.parseGlobalDeclaration(),
+        else => try self.@"error"(),
     }
 }
 
-fn parseGlobalDeclaration(self: *@This()) void {
+fn parseGlobalDeclaration(self: *@This()) !void {
     std.debug.assert(self.at(.identifier));
-    self.startNode(.global_declaration);
-    defer self.cst.finishNode();
+    try self.startNode(.global_declaration);
 
-    self.bump();
+    try self.bump();
 
     if (self.at(.@"[")) {
-        self.startNode(.vector_size);
-        defer self.cst.finishNode();
+        try self.startNode(.vector_size);
 
-        self.bump();
+        try self.bump();
 
-        if (!self.eat(.@"]")) {
-            self.parseExpression();
-            _ = self.eat(.@"]");
+        if (!try self.eat(.@"]")) {
+            try self.parseExpression();
+            _ = try self.eat(.@"]");
         }
+
+        try self.cst.finishNode();
     }
 
     if (self.at(.@"{")) {
-        self.startNode(.vector_initializer);
-        defer self.cst.finishNode();
+        try self.startNode(.vector_initializer);
 
-        self.bump();
+        try self.bump();
 
-        while (!self.at(.eof) and !self.eat(.@"}")) {
+        while (!self.at(.eof) and !try self.eat(.@"}")) {
             switch (self.peek()) {
                 .@";" => break,
-                .@"," => self.bump(),
-                else => self.parseExpression(),
+                .@"," => try self.bump(),
+                else => try self.parseExpression(),
             }
         }
+
+        try self.cst.finishNode();
     }
 
-    _ = self.eat(.@";");
+    _ = try self.eat(.@";");
+
+    try self.cst.finishNode();
 }
 
-fn parseFunction(self: *@This()) void {
+fn parseFunction(self: *@This()) !void {
     std.debug.assert(self.at(.identifier));
-    self.startNode(.function);
-    defer self.cst.finishNode();
+    try self.startNode(.function);
 
-    self.bump();
-    self.parseFunctionParameters();
-    self.parseStatement();
+    try self.bump();
+    try self.parseFunctionParameters();
+    try self.parseStatement();
+
+    try self.cst.finishNode();
 }
 
-fn parseFunctionParameters(self: *@This()) void {
+fn parseFunctionParameters(self: *@This()) !void {
     std.debug.assert(self.at(.@"("));
-    self.startNode(.function_parameters);
-    defer self.cst.finishNode();
+    try self.startNode(.function_parameters);
 
-    self.bump();
-    while (!self.at(.eof) and !self.eat(.@")"))
-        self.@"error"();
+    try self.bump();
+    while (!self.at(.eof) and !try self.eat(.@")"))
+        try self.@"error"();
+
+    try self.cst.finishNode();
 }
 
-fn parseStatement(self: *@This()) void {
+fn parseStatement(self: *@This()) error{OutOfMemory}!void {
     switch (self.peek()) {
-        .@";" => self.parseNullStatement(),
-        .@"{" => self.parseCompoundStatement(),
-        .kw_auto => self.parseAuto(),
-        .kw_extrn => self.parseExtrn(),
-        .kw_if => self.parseIf(),
-        .kw_while => self.parseWhile(),
-        else => self.parseExpressionStatement(),
+        .@";" => try self.parseNullStatement(),
+        .@"{" => try self.parseCompoundStatement(),
+        .kw_auto => try self.parseAuto(),
+        .kw_extrn => try self.parseExtrn(),
+        .kw_if => try self.parseIf(),
+        .kw_while => try self.parseWhile(),
+        else => try self.parseExpressionStatement(),
     }
 }
 
-fn parseNullStatement(self: *@This()) void {
+fn parseNullStatement(self: *@This()) !void {
     std.debug.assert(self.at(.@";"));
-    self.startNode(.null_statement);
-    defer self.cst.finishNode();
+    try self.startNode(.null_statement);
 
-    self.bump();
+    try self.bump();
+
+    try self.cst.finishNode();
 }
 
-fn parseCompoundStatement(self: *@This()) void {
+fn parseCompoundStatement(self: *@This()) !void {
     std.debug.assert(self.at(.@"{"));
-    self.startNode(.compound_statement);
-    defer self.cst.finishNode();
+    try self.startNode(.compound_statement);
 
-    self.bump();
-    while (!self.at(.eof) and !self.eat(.@"}"))
-        self.parseStatement();
+    try self.bump();
+    while (!self.at(.eof) and !try self.eat(.@"}"))
+        try self.parseStatement();
+
+    try self.cst.finishNode();
 }
 
-fn parseAuto(self: *@This()) void {
+fn parseAuto(self: *@This()) !void {
     std.debug.assert(self.at(.kw_auto));
-    self.startNode(.auto);
-    defer self.cst.finishNode();
+    try self.startNode(.auto);
 
-    self.bump();
+    try self.bump();
     while (true) {
         switch (self.peek()) {
-            .identifier, .@"," => self.bump(),
+            .identifier, .@"," => try self.bump(),
             .@";" => {
-                self.bump();
+                try self.bump();
                 break;
             },
             else => break,
         }
     }
+
+    try self.cst.finishNode();
 }
 
-fn parseExtrn(self: *@This()) void {
+fn parseExtrn(self: *@This()) !void {
     std.debug.assert(self.at(.kw_extrn));
-    self.startNode(.extrn);
-    defer self.cst.finishNode();
+    try self.startNode(.extrn);
 
-    self.bump();
+    try self.bump();
     while (true) {
         switch (self.peek()) {
-            .identifier, .@"," => self.bump(),
+            .identifier, .@"," => try self.bump(),
             .@";" => {
-                self.bump();
+                try self.bump();
                 break;
             },
             else => break,
         }
     }
+
+    try self.cst.finishNode();
 }
 
-fn parseIf(self: *@This()) void {
+fn parseIf(self: *@This()) !void {
     std.debug.assert(self.at(.kw_if));
-    self.startNode(.@"if");
-    defer self.cst.finishNode();
+    try self.startNode(.@"if");
 
-    self.bump();
-    _ = self.eat(.@"(");
-    self.parseExpression();
-    _ = self.eat(.@")");
-    self.parseStatement();
+    try self.bump();
+    _ = try self.eat(.@"(");
+    try self.parseExpression();
+    _ = try self.eat(.@")");
+    try self.parseStatement();
+
+    try self.cst.finishNode();
 }
 
-fn parseWhile(self: *@This()) void {
+fn parseWhile(self: *@This()) !void {
     std.debug.assert(self.at(.kw_while));
-    self.startNode(.@"while");
-    defer self.cst.finishNode();
+    try self.startNode(.@"while");
 
-    self.bump();
-    _ = self.eat(.@"(");
-    self.parseExpression();
-    _ = self.eat(.@")");
-    self.parseStatement();
+    try self.bump();
+    _ = try self.eat(.@"(");
+    try self.parseExpression();
+    _ = try self.eat(.@")");
+    try self.parseStatement();
+
+    try self.cst.finishNode();
 }
 
-fn parseExpressionStatement(self: *@This()) void {
-    self.startNode(.expression_statement);
-    defer self.cst.finishNode();
+fn parseExpressionStatement(self: *@This()) !void {
+    try self.startNode(.expression_statement);
 
-    self.parseExpression();
-    _ = self.eat(.@";");
+    try self.parseExpression();
+    _ = try self.eat(.@";");
+
+    try self.cst.finishNode();
 }
 
-fn parseExpression(self: *@This()) void {
-    self.parseExpressionRecursively(0);
+fn parseExpression(self: *@This()) error{OutOfMemory}!void {
+    try self.parseExpressionRecursively(0);
 }
 
-fn parseAtom(self: *@This()) void {
+fn parseAtom(self: *@This()) !void {
     switch (self.peek()) {
         .identifier => if (self.peekNth(1) == .@"(")
-            self.parseFunctionCall()
+            try self.parseFunctionCall()
         else
-            self.parseVariable(),
+            try self.parseVariable(),
         .number, .string_literal, .character_literal, .bcd_literal => {
-            self.startNode(.literal);
-            defer self.cst.finishNode();
-            self.bump();
+            try self.startNode(.literal);
+            try self.bump();
+            try self.cst.finishNode();
         },
-        .@"(" => self.parseParenthesizedExpression(),
-        else => self.@"error"(),
+        .@"(" => try self.parseParenthesizedExpression(),
+        else => try self.@"error"(),
     }
 }
 
-fn parseVariable(self: *@This()) void {
+fn parseVariable(self: *@This()) !void {
     std.debug.assert(self.at(.identifier));
-    self.startNode(.variable);
-    defer self.cst.finishNode();
+    try self.startNode(.variable);
 
-    self.bump();
+    try self.bump();
+
+    try self.cst.finishNode();
 }
 
-fn parseParenthesizedExpression(self: *@This()) void {
+fn parseParenthesizedExpression(self: *@This()) !void {
     std.debug.assert(self.at(.@"("));
-    self.startNode(.parenthesized_expression);
-    defer self.cst.finishNode();
+    try self.startNode(.parenthesized_expression);
 
-    self.bump();
-    self.parseExpression();
-    _ = self.eat(.@")");
+    try self.bump();
+    try self.parseExpression();
+    _ = try self.eat(.@")");
+
+    try self.cst.finishNode();
 }
 
-fn parseFunctionCall(self: *@This()) void {
+fn parseFunctionCall(self: *@This()) !void {
     std.debug.assert(self.at(.identifier));
-    self.startNode(.function_call);
-    defer self.cst.finishNode();
+    try self.startNode(.function_call);
 
-    self.bump();
+    try self.bump();
 
     std.debug.assert(self.at(.@"("));
-    self.startNode(.arguments);
-    defer self.cst.finishNode();
+    try self.startNode(.arguments);
 
-    self.bump();
-    while (!self.at(.eof) and !self.eat(.@")")) {
+    try self.bump();
+    while (!self.at(.eof) and !try self.eat(.@")")) {
         switch (self.peek()) {
-            .@"," => self.bump(),
-            else => self.parseExpression(),
+            .@"," => try self.bump(),
+            else => try self.parseExpression(),
         }
     }
+
+    try self.cst.finishNode();
+    try self.cst.finishNode();
 }
 
-fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) void {
-    const checkpoint = self.makeCheckpoint();
+fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) !void {
+    const checkpoint = try self.makeCheckpoint();
 
     if (prefixBindingPower(self.peek())) |bp_right| {
-        self.startNode(.prefix_operation);
-        defer self.cst.finishNode();
-        self.bump();
-        self.parseExpressionRecursively(bp_right);
-    } else self.parseAtom();
+        try self.startNode(.prefix_operation);
+        try self.bump();
+        try self.parseExpressionRecursively(bp_right);
+        try self.cst.finishNode();
+    } else try self.parseAtom();
 
     while (true) {
         const op = self.peek();
         if (postfixBindingPower(op)) |bp_left| {
             if (bp_left < bp_min) break;
 
-            self.cst.startNodeAt(checkpoint, .postfix_operation);
-            defer self.cst.finishNode();
+            try self.cst.startNodeAt(checkpoint, .postfix_operation);
 
-            self.bump();
+            try self.bump();
             if (op == .@"[") {
-                self.parseExpression();
-                _ = self.eat(.@"]");
+                try self.parseExpression();
+                _ = try self.eat(.@"]");
             }
+
+            try self.cst.finishNode();
         } else if (infixBindingPower(op)) |bp| {
             if (bp.left < bp_min) break;
 
-            self.cst.startNodeAt(checkpoint, .infix_operation);
-            defer self.cst.finishNode();
+            try self.cst.startNodeAt(checkpoint, .infix_operation);
 
-            self.bump();
+            try self.bump();
             if (op == .@"?") {
-                self.parseExpression();
-                _ = self.eat(.@":");
+                try self.parseExpression();
+                _ = try self.eat(.@":");
             }
-            self.parseExpressionRecursively(bp.right);
+            try self.parseExpressionRecursively(bp.right);
+
+            try self.cst.finishNode();
         } else {
             break;
         }
@@ -348,68 +365,68 @@ fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: Bind
     };
 }
 
-fn @"error"(self: *@This()) void {
-    self.startNode(.@"error");
-    defer self.cst.finishNode();
-    self.parseAnything();
+fn @"error"(self: *@This()) !void {
+    try self.startNode(.@"error");
+    try self.parseAnything();
+    try self.cst.finishNode();
 }
 
-fn parseAnything(self: *@This()) void {
+fn parseAnything(self: *@This()) !void {
     switch (self.peek()) {
         .@"(" => {
-            self.bump();
-            while (!self.at(.eof) and !self.eat(.@")"))
-                self.parseAnything();
+            try self.bump();
+            while (!self.at(.eof) and !try self.eat(.@")"))
+                try self.parseAnything();
         },
         .@"{" => {
-            self.bump();
-            while (!self.at(.eof) and !self.eat(.@"}"))
-                self.parseAnything();
+            try self.bump();
+            while (!self.at(.eof) and !try self.eat(.@"}"))
+                try self.parseAnything();
         },
         .@"[" => {
-            self.bump();
-            while (!self.at(.eof) and !self.eat(.@"]"))
-                self.parseAnything();
+            try self.bump();
+            while (!self.at(.eof) and !try self.eat(.@"]"))
+                try self.parseAnything();
         },
-        .@";" => self.parseNullStatement(),
-        .kw_auto => self.parseAuto(),
-        .kw_extrn => self.parseExtrn(),
-        .kw_if => self.parseIf(),
-        .kw_while => self.parseWhile(),
-        else => self.bump(),
+        .@";" => try self.parseNullStatement(),
+        .kw_auto => try self.parseAuto(),
+        .kw_extrn => try self.parseExtrn(),
+        .kw_if => try self.parseIf(),
+        .kw_while => try self.parseWhile(),
+        else => try self.bump(),
     }
 }
 
-fn bump(self: *@This()) void {
+fn bump(self: *@This()) !void {
     while (!self.at(.eof)) {
         const token = self.tokens.get(self.index);
-        self.cst.token(token.kind, token.source);
+        try self.cst.token(token.kind, token.source);
         self.index += 1;
         if (token.kind != .trivia) break;
     }
 }
 
-fn startNode(self: *@This(), kind: SyntaxKind) void {
-    self.skipTrivia();
-    self.cst.startNode(kind);
+fn startNode(self: *@This(), kind: SyntaxKind) !void {
+    try self.skipTrivia();
+    try self.cst.startNode(kind);
 }
 
-fn makeCheckpoint(self: *@This()) Cst.Checkpoint {
-    self.skipTrivia();
+fn makeCheckpoint(self: *@This()) !Cst.Builder.Checkpoint {
+    try self.skipTrivia();
     return self.cst.makeCheckpoint();
 }
 
-fn skipTrivia(self: *@This()) void {
+fn skipTrivia(self: *@This()) !void {
     while (self.index < self.tokens.len) : (self.index += 1) {
         const token = self.tokens.get(self.index);
         if (token.kind != .trivia) break;
-        self.cst.token(token.kind, token.source);
+        try self.cst.token(token.kind, token.source);
     }
 }
 
-fn eat(self: *@This(), kind: SyntaxKind) bool {
+fn eat(self: *@This(), kind: SyntaxKind) !bool {
     if (self.at(kind)) {
-        self.bump();
+        try self.bump();
         return true;
     } else return false;
 }
@@ -443,5 +460,9 @@ test "fuzz parser" {
         try tokens.append(std.testing.allocator, token);
     }
 
-    _ = parse(tokens.slice());
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const cst = try parse(tokens.slice(), arena.allocator());
+    defer cst.deinit(std.testing.allocator);
 }
