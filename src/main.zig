@@ -4,13 +4,13 @@ const Parser = @import("Parser.zig");
 const std = @import("std");
 
 pub fn main() !u8 {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
-    var string_arena = std.heap.ArenaAllocator.init(allocator);
+    var string_arena: std.heap.ArenaAllocator = .init(allocator);
     defer string_arena.deinit();
-    var diagnostics = Diagnostic.S.init(allocator, string_arena.allocator());
+    var diagnostics: Diagnostic.S = .init(allocator, string_arena.allocator());
     defer diagnostics.deinit();
 
     realMain(allocator, &diagnostics) catch |err| try diagnostics.emit(.@"error"(@errorName(err)));
@@ -45,8 +45,8 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
 
     diagnostics.source_code_start = source_code.ptr;
 
-    var lexer = Lexer.init(source_code);
-    var tokens = std.MultiArrayList(Lexer.Token){};
+    var lexer: Lexer = .init(source_code);
+    var tokens: std.MultiArrayList(Lexer.Token) = .{};
     defer tokens.deinit(allocator);
     while (lexer.next()) |token| {
         try tokens.append(allocator, token);
@@ -76,7 +76,7 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     }
 
     const cst = blk: {
-        var arena = std.heap.ArenaAllocator.init(allocator);
+        var arena: std.heap.ArenaAllocator = .init(allocator);
         defer arena.deinit();
         break :blk try Parser.parse(tokens.slice(), arena.allocator());
     };

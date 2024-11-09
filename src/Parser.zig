@@ -8,7 +8,7 @@ index: usize = 0,
 cst: Cst.Builder,
 
 pub fn parse(tokens: std.MultiArrayList(Token).Slice, arena: std.mem.Allocator) !Cst {
-    var self = @This(){ .tokens = tokens, .cst = .init(arena) };
+    var self: @This() = .{ .tokens = tokens, .cst = .init(arena) };
     try self.cst.startNode(.document);
     while (!self.at(.eof))
         try self.parseTopLevelItem();
@@ -452,15 +452,15 @@ fn peekNth(self: @This(), n: usize) SyntaxKind {
 
 test "fuzz parser" {
     const input_bytes = std.testing.fuzzInput(.{});
-    var lexer = @import("Lexer.zig").init(input_bytes);
-    var tokens = std.MultiArrayList(Token){};
+    var lexer: @import("Lexer.zig") = .init(input_bytes);
+    var tokens: std.MultiArrayList(Token) = .{};
     defer tokens.deinit(std.testing.allocator);
 
     while (lexer.next()) |token| {
         try tokens.append(std.testing.allocator, token);
     }
 
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena.deinit();
 
     const cst = try parse(tokens.slice(), arena.allocator());

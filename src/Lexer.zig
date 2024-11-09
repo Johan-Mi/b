@@ -85,7 +85,7 @@ pub const Token = struct {
 const identifier_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._";
 const all_valid_chars = identifier_chars ++ "!\"#%&'()*+,-/:;<=>?@[]^`{|}";
 
-const keywords = blk: {
+const keywords: std.StaticStringMap(SyntaxKind) = blk: {
     const prefix = "kw_";
     const syntax_kinds = @typeInfo(SyntaxKind).@"enum".fields;
     var array: [syntax_kinds.len]struct { []const u8, SyntaxKind } = undefined;
@@ -96,7 +96,7 @@ const keywords = blk: {
             len += 1;
         }
     }
-    break :blk std.StaticStringMap(SyntaxKind).initComptime(array[0..len]);
+    break :blk .initComptime(array[0..len]);
 };
 
 const symbols = blk: {
