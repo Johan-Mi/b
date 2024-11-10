@@ -7,13 +7,17 @@ tokens: std.MultiArrayList(Token).Slice,
 index: usize = 0,
 cst: Cst.Builder,
 
-pub fn parse(tokens: std.MultiArrayList(Token).Slice, arena: std.mem.Allocator) !Cst {
+pub fn parse(
+    tokens: std.MultiArrayList(Token).Slice,
+    arena: std.mem.Allocator,
+    cst_allocator: std.mem.Allocator,
+) !Cst {
     var self: @This() = .{ .tokens = tokens, .cst = .init(arena) };
     try self.cst.startNode(.document);
     while (!self.at(.eof))
         try self.parseTopLevelItem();
     try self.cst.finishNode();
-    return self.cst.finish();
+    return self.cst.finish(cst_allocator);
 }
 
 fn parseTopLevelItem(self: *@This()) !void {
@@ -463,6 +467,6 @@ test "fuzz parser" {
     var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena.deinit();
 
-    const cst = try parse(tokens.slice(), arena.allocator());
+    const cst = try parse(tokens.slice(), arena.allocator(), std.testing.allocator);
     defer cst.deinit(std.testing.allocator);
 }

@@ -44,6 +44,14 @@ pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
     children.deinit(allocator);
 }
 
+pub fn dump(self: @This()) void {
+    const nodes = self.nodes.slice();
+    for (0.., nodes.items(.kind), nodes.items(.children)) |i, kind, children| {
+        const child_slice = self.children.items[children.start..][0..children.count];
+        log.info("{}: {s} {any}", .{ i, @tagName(kind), child_slice });
+    }
+}
+
 pub const Builder = struct {
     events: std.ArrayList(Event),
 
@@ -57,32 +65,60 @@ pub const Builder = struct {
         return .{ .events = .init(arena) };
     }
 
-    pub fn finish(self: @This()) Cst {
-        var indent: usize = 0;
-        const indent_width = 2;
-        for (self.events.items) |event| {
+    pub fn finish(self: @This(), allocator: std.mem.Allocator) !Cst {
+        var threaded_tree: ?*ThreadedNode = try self.intoThreadedTree();
+
+        var cst: Cst = .{ .nodes = .{}, .children = .{} };
+        errdefer cst.deinit(allocator);
+
+        while (threaded_tree) |threaded_node| : (threaded_tree = threaded_node.next) {
+            if (threaded_node.index) |index|
+                cst.children.items[index] = @enumFromInt(cst.nodes.len);
+            const start = cst.children.items.len;
+            const count = threaded_node.children.items.len;
+            try cst.nodes.append(allocator, .{
+                .kind = threaded_node.kind,
+                .children = .{ .start = start, .count = count },
+            });
+            _ = try cst.children.addManyAsSlice(allocator, count);
+            for (threaded_node.children.items, start..) |child, index|
+                child.index = index;
+        }
+
+        return cst;
+    }
+
+    const ThreadedNode = struct {
+        kind: SyntaxKind,
+        children: std.ArrayListUnmanaged(*@This()) = .empty,
+        next: ?*@This() = null,
+        index: ?usize = null,
+    };
+
+    fn intoThreadedTree(self: @This()) !*ThreadedNode {
+        var stack: std.ArrayListUnmanaged(*ThreadedNode) = .empty;
+        var prev: ?*ThreadedNode = null;
+        var events = self.events;
+        std.debug.assert(events.pop() == .close);
+        const arena = events.allocator;
+        for (events.items) |event| {
             switch (event) {
                 .open => |kind| {
-                    log.debug(
-                        "{s:[2]}start node: {s}",
-                        .{ "", @tagName(kind), indent * indent_width },
-                    );
-                    indent += 1;
+                    const node = try arena.create(ThreadedNode);
+                    node.* = .{ .kind = kind };
+                    try stack.append(arena, node);
+                    if (prev) |p| p.next = node;
+                    prev = node;
                 },
-                .token => |kind| log.debug(
-                    "{s:[2]}token: {s}",
-                    .{ "", @tagName(kind), indent * indent_width },
-                ),
+                .token => {},
                 .close => {
-                    log.debug(
-                        "{s:[1]}finish node",
-                        .{ "", indent * indent_width },
-                    );
-                    indent -= 1;
+                    const child = stack.pop();
+                    try stack.items[stack.items.len - 1].children.append(arena, child);
                 },
             }
         }
-        return .{ .nodes = .{}, .children = .{} };
+        std.debug.assert(stack.items.len == 1);
+        return stack.items[0];
     }
 
     pub fn startNode(self: *@This(), kind: SyntaxKind) !void {
