@@ -82,6 +82,8 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     };
     defer cst.deinit(allocator);
     cst.dump();
+
+    try @import("codegen.zig").compile("main.bc");
 }
 
 test {
