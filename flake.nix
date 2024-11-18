@@ -20,7 +20,7 @@
         src = cleanSource ./.;
 
         nativeBuildInputs = with env.pkgs; [];
-        buildInputs = with env.pkgsForTarget target; [ xorg.libxcb ];
+        buildInputs = with env.pkgsForTarget target; [ libllvm ];
 
         # Smaller binaries and avoids shipping glibc.
         zigPreferMusl = true;
@@ -75,7 +75,7 @@
 
       # nix develop
       devShells.default = env.mkShell {
-        buildInputs = [ env.pkgs.zls ];
+        buildInputs = [ env.pkgs.libllvm env.pkgs.zls ];
       };
     }));
 }

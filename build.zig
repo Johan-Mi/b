@@ -21,7 +21,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.addLibraryPath(.{ .cwd_relative = "/usr/lib/llvm/17/lib64/" });
+    // FIXME: don't hardcode this
+    exe.addLibraryPath(.{ .cwd_relative = "/nix/store/9zb96sh3l4r305y91zcscc6p50ac4inh-llvm-18.1.8-lib/lib" });
     exe.linkSystemLibrary("LLVM");
     exe.linkLibC();
 
