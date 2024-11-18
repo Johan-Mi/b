@@ -21,10 +21,21 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    // FIXME: don't hardcode this
-    exe.addLibraryPath(.{ .cwd_relative = "/nix/store/9zb96sh3l4r305y91zcscc6p50ac4inh-llvm-18.1.8-lib/lib" });
-    exe.linkSystemLibrary("LLVM");
-    exe.linkLibC();
+    blk: {
+        const result = std.process.Child.run(.{
+            .allocator = b.allocator,
+            .argv = &.{ "llvm-config", "--libdir" },
+        }) catch {
+            exe.step.dependOn(&b.addFail("failed to get LLVM library path").step);
+            break :blk;
+        };
+        defer b.allocator.free(result.stdout);
+        defer b.allocator.free(result.stderr);
+        const path = std.mem.trimRight(u8, result.stdout, "\n");
+        exe.addLibraryPath(.{ .cwd_relative = path });
+        exe.linkSystemLibrary("LLVM");
+        exe.linkLibC();
+    }
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
