@@ -83,7 +83,13 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     defer cst.deinit(allocator);
     cst.dump();
 
-    try @import("codegen.zig").compile("main.bc");
+    const program: @import("ir.zig").Program = .{ .functions = &.{.{
+        .name = "main",
+        .parameter_count = 2,
+        .body = .noop,
+    }} };
+
+    try @import("codegen.zig").compile(program, "main.bc");
 }
 
 test {
