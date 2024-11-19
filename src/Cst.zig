@@ -6,9 +6,14 @@ const log = std.log.scoped(.cst);
 nodes: std.MultiArrayList(struct {
     kind: SyntaxKind,
     /// Indices into `Cst.children`.
-    children: struct { start: usize, count: usize },
+    children: struct { start: Start, count: usize },
 }),
 children: std.ArrayListUnmanaged(Node),
+
+const Start = enum(usize) {
+    token = std.math.maxInt(usize),
+    _,
+};
 
 pub const Node = enum(usize) {
     _,
@@ -47,8 +52,13 @@ pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
 pub fn dump(self: @This()) void {
     const nodes = self.nodes.slice();
     for (0.., nodes.items(.kind), nodes.items(.children)) |i, kind, children| {
-        const child_slice = self.children.items[children.start..][0..children.count];
-        log.info("{}: {s} {any}", .{ i, @tagName(kind), child_slice });
+        if (children.start == .token) {
+            log.info("{}: {s}", .{ i, @tagName(kind) });
+        } else {
+            const child_slice =
+                self.children.items[@intFromEnum(children.start)..][0..children.count];
+            log.info("{}: {s} {any}", .{ i, @tagName(kind), child_slice });
+        }
     }
 }
 
@@ -74,15 +84,20 @@ pub const Builder = struct {
         while (threaded_tree) |threaded_node| : (threaded_tree = threaded_node.next) {
             if (threaded_node.index) |index|
                 cst.children.items[index] = @enumFromInt(cst.nodes.len);
-            const start = cst.children.items.len;
-            const count = threaded_node.children.items.len;
+            const start: Start = if (threaded_node.children) |_|
+                @enumFromInt(cst.children.items.len)
+            else
+                .token;
+            const count = if (threaded_node.children) |c| c.items.len else 0;
             try cst.nodes.append(allocator, .{
                 .kind = threaded_node.kind,
                 .children = .{ .start = start, .count = count },
             });
             _ = try cst.children.addManyAsSlice(allocator, count);
-            for (threaded_node.children.items, start..) |child, index|
-                child.index = index;
+            if (threaded_node.children) |c| {
+                for (c.items, @intFromEnum(start)..) |child, index|
+                    child.index = index;
+            }
         }
 
         return cst;
@@ -90,7 +105,8 @@ pub const Builder = struct {
 
     const ThreadedNode = struct {
         kind: SyntaxKind,
-        children: std.ArrayListUnmanaged(*@This()) = .empty,
+        /// Null iff this is a token.
+        children: ?std.ArrayListUnmanaged(*@This()),
         next: ?*@This() = null,
         index: ?usize = null,
     };
@@ -105,15 +121,21 @@ pub const Builder = struct {
             switch (event) {
                 .open => |kind| {
                     const node = try arena.create(ThreadedNode);
-                    node.* = .{ .kind = kind };
+                    node.* = .{ .kind = kind, .children = .empty };
                     try stack.append(arena, node);
                     if (prev) |p| p.next = node;
                     prev = node;
                 },
-                .token => {},
+                .token => |kind| {
+                    const node = try arena.create(ThreadedNode);
+                    node.* = .{ .kind = kind, .children = null };
+                    if (prev) |p| p.next = node;
+                    prev = node;
+                    try stack.items[stack.items.len - 1].children.?.append(arena, node);
+                },
                 .close => {
                     const child = stack.pop();
-                    try stack.items[stack.items.len - 1].children.append(arena, child);
+                    try stack.items[stack.items.len - 1].children.?.append(arena, child);
                 },
             }
         }
