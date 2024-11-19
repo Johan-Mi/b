@@ -8,9 +8,9 @@ pub const Context = opaque {
 
 pub const Module = opaque {
     pub fn init(context: *Context) *Module {
-        return LLVMModuleCreateWithName(context, null);
+        return LLVMModuleCreateWithNameInContext(null, context);
     }
-    extern fn LLVMModuleCreateWithName(*Context, ?[*:0]const u8) *Module;
+    extern fn LLVMModuleCreateWithNameInContext(?[*:0]const u8, *Context) *Module;
 
     pub const deinit = LLVMDisposeModule;
     extern fn LLVMDisposeModule(*Module) void;
