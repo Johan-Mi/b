@@ -12,12 +12,24 @@ pub const Function = struct {
     syntax: Cst.Node,
 
     const cast = CastImpl(@This(), .function).cast;
+    pub const name = ChildTokenImpl(@This(), .identifier).find;
 };
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {
     return struct {
         fn cast(syntax: Cst.Node, cst: Cst) ?Self {
             return if (syntax.kind(cst) == syntax_kind) .{ .syntax = syntax } else null;
+        }
+    };
+}
+
+fn ChildTokenImpl(Self: type, syntax_kind: SyntaxKind) type {
+    return struct {
+        fn find(self: Self, cst: Cst) ?Cst.Node {
+            var iterator = self.syntax.children(cst);
+            return while (iterator.next(cst)) |child| {
+                if (child.kind(cst) == syntax_kind) break child;
+            } else null;
         }
     };
 }

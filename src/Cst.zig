@@ -4,6 +4,7 @@ const SyntaxKind = @import("syntax.zig").Kind;
 const log = std.log.scoped(.cst);
 
 nodes: std.MultiArrayList(struct {
+    source: ?[]const u8,
     kind: SyntaxKind,
     /// Indices into `Cst.children`.
     children: struct { start: Start, count: usize },
@@ -18,6 +19,10 @@ const Start = enum(usize) {
 pub const Node = enum(usize) {
     root = 0,
     _,
+
+    pub fn source(self: @This(), cst: Cst) []const u8 {
+        return cst.nodes.items(.source)[@intFromEnum(self)].?;
+    }
 
     pub fn kind(self: @This(), cst: Cst) SyntaxKind {
         return cst.nodes.items(.kind)[@intFromEnum(self)];
@@ -70,7 +75,10 @@ pub const Builder = struct {
 
     const Event = union(enum) {
         open: SyntaxKind,
-        token: SyntaxKind,
+        token: struct {
+            source: []const u8,
+            kind: SyntaxKind,
+        },
         close,
     };
 
@@ -93,6 +101,7 @@ pub const Builder = struct {
                 .token;
             const count = if (threaded_node.children) |c| c.items.len else 0;
             try cst.nodes.append(allocator, .{
+                .source = threaded_node.source,
                 .kind = threaded_node.kind,
                 .children = .{ .start = start, .count = count },
             });
@@ -107,6 +116,7 @@ pub const Builder = struct {
     }
 
     const ThreadedNode = struct {
+        source: ?[]const u8,
         kind: SyntaxKind,
         /// Null iff this is a token.
         children: ?std.ArrayListUnmanaged(*@This()),
@@ -124,14 +134,14 @@ pub const Builder = struct {
             switch (event) {
                 .open => |kind| {
                     const node = try arena.create(ThreadedNode);
-                    node.* = .{ .kind = kind, .children = .empty };
+                    node.* = .{ .source = null, .kind = kind, .children = .empty };
                     try stack.append(arena, node);
                     if (prev) |p| p.next = node;
                     prev = node;
                 },
-                .token => |kind| {
+                .token => |it| {
                     const node = try arena.create(ThreadedNode);
-                    node.* = .{ .kind = kind, .children = null };
+                    node.* = .{ .source = it.source, .kind = it.kind, .children = null };
                     if (prev) |p| p.next = node;
                     prev = node;
                     try stack.items[stack.items.len - 1].children.?.append(arena, node);
@@ -155,8 +165,7 @@ pub const Builder = struct {
     }
 
     pub fn token(self: *@This(), kind: SyntaxKind, text: []const u8) !void {
-        _ = text; // autofix
-        try self.events.append(.{ .token = kind });
+        try self.events.append(.{ .token = .{ .source = text, .kind = kind } });
     }
 
     pub const Checkpoint = enum(usize) { _ };
