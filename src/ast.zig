@@ -1,14 +1,14 @@
 const Cst = @import("Cst.zig");
 const SyntaxKind = @import("syntax.zig").Kind;
 
-const Document = struct {
+pub const Document = struct {
     syntax: Cst.Node,
 
-    const cast = CastImpl(@This(), .document).cast;
-    const functions = ChildrenImpl(@This(), Function).init;
+    pub const cast = CastImpl(@This(), .document).cast;
+    pub const functions = ChildrenImpl(@This(), Function).init;
 };
 
-const Function = struct {
+pub const Function = struct {
     syntax: Cst.Node,
 
     const cast = CastImpl(@This(), .function).cast;
@@ -16,8 +16,8 @@ const Function = struct {
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {
     return struct {
-        fn cast(syntax: Cst.Node) ?Self {
-            return if (syntax.kind() == syntax_kind) .{ .syntax = syntax } else null;
+        fn cast(syntax: Cst.Node, cst: Cst) ?Self {
+            return if (syntax.kind(cst) == syntax_kind) .{ .syntax = syntax } else null;
         }
     };
 }
@@ -26,14 +26,21 @@ fn ChildrenImpl(Self: type, Child: type) type {
     return struct {
         iterator: Cst.Node.ChildIterator,
 
-        fn init(self: Self) @This() {
-            return .{ .iterator = self.syntax.children() };
+        fn init(self: Self, cst: Cst) @This() {
+            return .{ .iterator = self.syntax.children(cst) };
         }
 
-        fn next(self: *@This()) ?Child {
-            return while (self.iterator.next()) |node| {
-                if (Child.cast(node)) |child| break child;
+        pub fn next(self: *@This(), cst: Cst) ?Child {
+            return while (self.iterator.next(cst)) |node| {
+                if (Child.cast(node, cst)) |child| break child;
             } else null;
+        }
+
+        pub fn count(self: @This(), cst: Cst) usize {
+            var copy = self;
+            var i: usize = 0;
+            while (copy.next(cst)) |_| i += 1;
+            return i;
         }
     };
 }

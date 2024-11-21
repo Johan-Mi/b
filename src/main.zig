@@ -83,9 +83,13 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     defer cst.deinit(allocator);
     cst.dump();
 
-    const program = @import("ir/lowering.zig").lower(cst);
+    {
+        var arena: std.heap.ArenaAllocator = .init(allocator);
+        defer arena.deinit();
+        const program = try @import("ir/lowering.zig").lower(cst, arena.allocator());
 
-    try @import("codegen.zig").compile(program, "main.bc");
+        try @import("codegen.zig").compile(program, "main.bc");
+    }
 }
 
 test {

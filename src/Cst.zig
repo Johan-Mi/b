@@ -16,6 +16,7 @@ const Start = enum(usize) {
 };
 
 pub const Node = enum(usize) {
+    root = 0,
     _,
 
     pub fn kind(self: @This(), cst: Cst) SyntaxKind {
@@ -23,8 +24,10 @@ pub const Node = enum(usize) {
     }
 
     pub fn children(self: @This(), cst: Cst) ChildIterator {
-        const start, const count = cst.nodes.items(.children)[@intFromEnum(self)];
-        return .{ .start = start, .end = start + count };
+        const range = cst.nodes.items(.children)[@intFromEnum(self)];
+        std.debug.assert(range.start != .token);
+        const start = @intFromEnum(range.start);
+        return .{ .start = start, .end = start + range.count };
     }
 
     pub const ChildIterator = struct {
@@ -34,7 +37,7 @@ pub const Node = enum(usize) {
         pub fn next(self: *@This(), cst: Cst) ?Node {
             if (self.start < self.end) {
                 defer self.start += 1;
-                return cst.children[self.start];
+                return cst.children.items[self.start];
             } else return null;
         }
     };
