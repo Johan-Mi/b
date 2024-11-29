@@ -13,12 +13,48 @@ pub const Function = struct {
 
     const cast = CastImpl(@This(), .function).cast;
     pub const name = ChildTokenImpl(@This(), .identifier).find;
+    pub const body = ChildImpl(@This(), Statement).find;
+};
+
+pub const Statement = union(enum) {
+    compound: CompoundStatement,
+
+    const cast = CastUnionEnumImpl(@This()).cast;
+};
+
+pub const CompoundStatement = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .compound_statement).cast;
+    pub const statements = ChildrenImpl(@This(), Statement).init;
 };
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {
     return struct {
         fn cast(syntax: Cst.Node, cst: Cst) ?Self {
             return if (syntax.kind(cst) == syntax_kind) .{ .syntax = syntax } else null;
+        }
+    };
+}
+
+fn CastUnionEnumImpl(Self: type) type {
+    return struct {
+        fn cast(syntax: Cst.Node, cst: Cst) ?Self {
+            const type_info = @typeInfo(Self).@"union";
+            return inline for (type_info.fields) |field| {
+                if (field.type.cast(syntax, cst)) |it| break @unionInit(Self, field.name, it);
+            } else null;
+        }
+    };
+}
+
+fn ChildImpl(Self: type, Child: type) type {
+    return struct {
+        fn find(self: Self, cst: Cst) ?Child {
+            var iterator = self.syntax.children(cst);
+            return while (iterator.next(cst)) |node| {
+                if (Child.cast(node, cst)) |child| break child;
+            } else null;
         }
     };
 }

@@ -8,4 +8,8 @@ pub const Function = struct {
     body: Statement,
 };
 
-pub const Statement = enum { noop };
+pub const Statement = union(enum) {
+    compound: []Statement,
+
+    @"error",
+};

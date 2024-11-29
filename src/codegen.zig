@@ -36,6 +36,7 @@ fn compileFunction(function: ir.Function, module: *llvm.Module, word_type: *llvm
 
 fn compileStatement(statement: ir.Statement) void {
     switch (statement) {
-        .noop => {},
+        .compound => |it| for (it) |s| compileStatement(s),
+        .@"error" => unreachable,
     }
 }
