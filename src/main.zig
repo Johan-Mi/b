@@ -81,7 +81,8 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         break :blk try Parser.parse(tokens.slice(), arena.allocator(), allocator);
     };
     defer cst.deinit(allocator);
-    cst.dump();
+
+    if (std.process.hasEnvVarConstant("DUMP_CST")) cst.dump();
 
     {
         var arena: std.heap.ArenaAllocator = .init(allocator);
