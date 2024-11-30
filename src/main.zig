@@ -89,6 +89,10 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         defer arena.deinit();
         const program = try @import("ir/lowering.zig").lower(cst, arena.allocator(), diagnostics);
 
+        if (std.process.hasEnvVarConstant("DUMP_IR")) {
+            std.log.info("{}", .{std.json.fmt(program, .{})});
+        }
+
         try @import("codegen.zig").compile(program, "main.bc");
     }
 }
