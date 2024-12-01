@@ -1,3 +1,5 @@
+const SyntaxKind = @import("syntax.zig").Kind;
+
 pub const Program = struct {
     functions: []const Function,
 };
@@ -10,6 +12,17 @@ pub const Function = struct {
 
 pub const Statement = union(enum) {
     compound: []Statement,
+    expression: Expression,
+
+    @"error",
+};
+
+pub const Expression = union(enum) {
+    infix: struct {
+        lhs: *Expression,
+        operator: SyntaxKind,
+        rhs: *Expression,
+    },
 
     @"error",
 };

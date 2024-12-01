@@ -51,3 +51,18 @@ pub const Type = opaque {
     }
     extern fn LLVMFunctionType(*Type, [*]const *Type, c_uint, is_variadic: bool) *Type;
 };
+
+pub const Value = opaque {};
+
+pub const Builder = opaque {
+    pub const init = LLVMCreateBuilderInContext;
+    extern fn LLVMCreateBuilderInContext(*Context) *Builder;
+
+    pub const deinit = LLVMDisposeBuilder;
+    extern fn LLVMDisposeBuilder(*Builder) void;
+
+    pub fn add(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildAdd(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildAdd(*Builder, *Value, *Value, [*:0]const u8) *Value;
+};

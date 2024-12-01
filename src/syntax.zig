@@ -100,6 +100,7 @@ pub const Kind = enum {
     prefix_operation,
     postfix_operation,
     infix_operation,
+    rhs,
 
     trivia,
     @"error",

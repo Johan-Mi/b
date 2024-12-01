@@ -292,7 +292,9 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) !void {
                 try self.parseExpression();
                 _ = try self.eat(.@":");
             }
+            try self.startNode(.rhs);
             try self.parseExpressionRecursively(bp.right);
+            try self.cst.finishNode();
 
             try self.cst.finishNode();
         } else {
@@ -318,7 +320,7 @@ fn postfixBindingPower(kind: SyntaxKind) ?BindingPower {
     };
 }
 
-fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: BindingPower } {
+pub fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: BindingPower } {
     return switch (kind) {
         .@"=",
         .@"*=",

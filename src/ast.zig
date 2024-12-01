@@ -1,3 +1,4 @@
+const Parser = @import("Parser.zig");
 const Cst = @import("Cst.zig");
 const SyntaxKind = @import("syntax.zig").Kind;
 
@@ -18,6 +19,7 @@ pub const Function = struct {
 
 pub const Statement = union(enum) {
     compound: CompoundStatement,
+    expression: ExpressionStatement,
 
     const cast = CastUnionEnumImpl(@This()).cast;
 };
@@ -27,6 +29,43 @@ pub const CompoundStatement = struct {
 
     const cast = CastImpl(@This(), .compound_statement).cast;
     pub const statements = ChildrenImpl(@This(), Statement).init;
+};
+
+pub const ExpressionStatement = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .expression_statement).cast;
+    pub const expression = ChildImpl(@This(), Expression).find;
+};
+
+pub const Expression = union(enum) {
+    infix: InfixOperation,
+
+    const cast = CastUnionEnumImpl(@This()).cast;
+};
+
+pub const InfixOperation = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .infix_operation).cast;
+
+    pub const lhs = ChildImpl(@This(), Expression).find;
+    pub const rhs = ChildImpl(@This(), Rhs).find;
+
+    pub fn operator(self: @This(), cst: Cst) ?Cst.Node {
+        var iterator = self.syntax.children(cst);
+        return while (iterator.next(cst)) |child| {
+            if (Parser.infixBindingPower(child.kind(cst))) |_| break child;
+        } else null;
+    }
+};
+
+pub const Rhs = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .rhs).cast;
+
+    pub const expression = ChildImpl(@This(), Expression).find;
 };
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {

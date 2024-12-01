@@ -58,5 +58,40 @@ fn lowerStatement(
             }
             break :blk .{ .compound = statements };
         },
+        .expression => |it| .{
+            .expression = try lowerExpressionOpt(it.expression(cst), cst, arena),
+        },
     };
+}
+
+fn lowerExpression(
+    expression: ast.Expression,
+    cst: Cst,
+    arena: std.mem.Allocator,
+) error{OutOfMemory}!ir.Expression {
+    return switch (expression) {
+        .infix => |it| .{ .infix = .{
+            .lhs = try box(arena, try lowerExpressionOpt(it.lhs(cst), cst, arena)),
+            .operator = it.operator(cst).?.kind(cst),
+            .rhs = try box(arena, try lowerExpressionOpt(
+                it.rhs(cst).?.expression(cst),
+                cst,
+                arena,
+            )),
+        } },
+    };
+}
+
+fn lowerExpressionOpt(
+    expression: ?ast.Expression,
+    cst: Cst,
+    arena: std.mem.Allocator,
+) !ir.Expression {
+    return if (expression) |it| lowerExpression(it, cst, arena) else .@"error";
+}
+
+fn box(allocator: std.mem.Allocator, value: anytype) !*@TypeOf(value) {
+    const slot = try allocator.create(@TypeOf(value));
+    slot.* = value;
+    return slot;
 }

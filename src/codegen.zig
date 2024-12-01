@@ -13,7 +13,10 @@ pub fn compile(program: ir.Program, output_path: [*:0]const u8) !void {
 
     const word_type: *llvm.Type = .int64(context);
 
-    for (program.functions) |function| compileFunction(function, module, word_type);
+    const builder: *llvm.Builder = .init(context);
+    defer builder.deinit();
+
+    for (program.functions) |function| compileFunction(function, module, builder, word_type);
 
     switch (builtin.mode) {
         .Debug, .ReleaseSafe => module.verify(),
@@ -23,7 +26,12 @@ pub fn compile(program: ir.Program, output_path: [*:0]const u8) !void {
     try module.write(output_path);
 }
 
-fn compileFunction(function: ir.Function, module: *llvm.Module, word_type: *llvm.Type) void {
+fn compileFunction(
+    function: ir.Function,
+    module: *llvm.Module,
+    builder: *llvm.Builder,
+    word_type: *llvm.Type,
+) void {
     const max_parameters = std.math.maxInt(@TypeOf(function.parameter_count));
     const all_parameters: [max_parameters]*llvm.Type = @splat(word_type);
     const parameters = all_parameters[0..function.parameter_count];
@@ -31,12 +39,66 @@ fn compileFunction(function: ir.Function, module: *llvm.Module, word_type: *llvm
     const signature: *llvm.Type = .function(parameters, return_type);
     const l_function: *llvm.Function = .init(module, function.name, signature);
     _ = l_function; // autofix
-    compileStatement(function.body);
+    compileStatement(function.body, builder);
 }
 
-fn compileStatement(statement: ir.Statement) void {
+fn compileStatement(statement: ir.Statement, builder: *llvm.Builder) void {
     switch (statement) {
-        .compound => |it| for (it) |s| compileStatement(s),
+        .compound => |it| for (it) |s| compileStatement(s, builder),
+        .expression => |it| _ = compileExpression(it, builder),
         .@"error" => unreachable,
     }
+}
+
+fn compileExpression(expression: ir.Expression, builder: *llvm.Builder) *llvm.Value {
+    return switch (expression) {
+        .infix => |it| blk: {
+            const lhs = compileExpression(it.lhs.*, builder);
+            const rhs = compileExpression(it.rhs.*, builder);
+            break :blk switch (it.operator) {
+                .@"=" => @panic("="),
+                .@"*=" => @panic("*="),
+                .@"/=" => @panic("/="),
+                .@"%=" => @panic("%="),
+                .@"+=" => @panic("+="),
+                .@"-=" => @panic("-="),
+                .@"<<=" => @panic("<<="),
+                .@">>=" => @panic(">>="),
+                .@"&=" => @panic("&="),
+                .@"^=" => @panic("^="),
+                .@"|=" => @panic("|="),
+                .@"?" => @panic("?"),
+                .@"||" => @panic("||"),
+                .@"&&" => @panic("&&"),
+                .@"==" => @panic("=="),
+                .@"!=" => @panic("!="),
+                .@"<" => @panic("<"),
+                .@"<=" => @panic("<="),
+                .@">" => @panic(">"),
+                .@">=" => @panic(">="),
+                .@"#==" => @panic("#=="),
+                .@"#!=" => @panic("#!="),
+                .@"#<" => @panic("#<"),
+                .@"#<=" => @panic("#<="),
+                .@"#>" => @panic("#>"),
+                .@"#>=" => @panic("#>="),
+                .@"+" => builder.add(lhs, rhs),
+                .@"-" => @panic("-"),
+                .@"#+" => @panic("#+"),
+                .@"#-" => @panic("#-"),
+                .@"*" => @panic("*"),
+                .@"/" => @panic("/"),
+                .@"%" => @panic("%"),
+                .@"#*" => @panic("#*"),
+                .@"#/" => @panic("#/"),
+                .@"|" => @panic("|"),
+                .@"^" => @panic("^"),
+                .@"&" => @panic("&"),
+                .@"<<" => @panic("<<"),
+                .@">>" => @panic(">>"),
+                else => unreachable,
+            };
+        },
+        .@"error" => unreachable,
+    };
 }
