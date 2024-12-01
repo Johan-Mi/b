@@ -38,6 +38,11 @@ const VerifierFailureAction = enum(c_int) {
 pub const Function = opaque {
     pub const init = LLVMAddFunction;
     extern fn LLVMAddFunction(*Module, [*:0]const u8, *Type) *Function;
+
+    pub fn appendBasicBlock(self: *Function) *BasicBlock {
+        return LLVMAppendBasicBlock(self, "");
+    }
+    extern fn LLVMAppendBasicBlock(*Function, [*:0]const u8) *BasicBlock;
 };
 
 pub const Type = opaque {
@@ -52,6 +57,8 @@ pub const Type = opaque {
     extern fn LLVMFunctionType(*Type, [*]const *Type, c_uint, is_variadic: bool) *Type;
 };
 
+pub const BasicBlock = opaque {};
+
 pub const Value = opaque {};
 
 pub const Builder = opaque {
@@ -60,6 +67,9 @@ pub const Builder = opaque {
 
     pub const deinit = LLVMDisposeBuilder;
     extern fn LLVMDisposeBuilder(*Builder) void;
+
+    pub const positionAtEnd = LLVMPositionBuilderAtEnd;
+    extern fn LLVMPositionBuilderAtEnd(*Builder, *BasicBlock) void;
 
     pub fn add(self: *Builder, lhs: *Value, rhs: *Value) *Value {
         return LLVMBuildAdd(self, lhs, rhs, "");

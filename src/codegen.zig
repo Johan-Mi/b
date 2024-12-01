@@ -38,7 +38,8 @@ fn compileFunction(
     const return_type = word_type;
     const signature: *llvm.Type = .function(parameters, return_type);
     const l_function: *llvm.Function = .init(module, function.name, signature);
-    _ = l_function; // autofix
+    const entry = l_function.appendBasicBlock();
+    builder.positionAtEnd(entry);
     compileStatement(function.body, builder);
 }
 
