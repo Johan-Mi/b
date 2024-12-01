@@ -49,6 +49,9 @@ pub const Type = opaque {
     pub const int64 = LLVMInt64TypeInContext;
     extern fn LLVMInt64TypeInContext(*Context) *Type;
 
+    pub const double = LLVMDoubleTypeInContext;
+    extern fn LLVMDoubleTypeInContext(*Context) *Type;
+
     pub fn function(parameters: []const *Type, return_type: *Type) *Type {
         const parameter_count = std.math.cast(c_uint, parameters.len) orelse
             @panic("too many parameters");
@@ -75,4 +78,121 @@ pub const Builder = opaque {
         return LLVMBuildAdd(self, lhs, rhs, "");
     }
     extern fn LLVMBuildAdd(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn fAdd(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildFAdd(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildFAdd(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn sub(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildSub(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildSub(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn fSub(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildFSub(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildFSub(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn mul(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildMul(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildMul(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn fMul(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildFMul(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildFMul(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn sDiv(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildSDiv(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildSDiv(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn fDiv(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildFDiv(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildFDiv(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn sRem(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildSRem(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildSRem(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn shl(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildShl(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildShl(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn lShr(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildLShr(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildLShr(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn @"and"(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildAnd(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildAnd(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn @"or"(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildOr(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildOr(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn xor(self: *Builder, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildXor(self, lhs, rhs, "");
+    }
+    extern fn LLVMBuildXor(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn zExt(self: *Builder, operand: *Value, dest_type: *Type) *Value {
+        return LLVMBuildZExt(self, operand, dest_type, "");
+    }
+    extern fn LLVMBuildZExt(*Builder, *Value, *Type, [*:0]const u8) *Value;
+
+    pub fn bitCast(self: *Builder, operand: *Value, dest_type: *Type) *Value {
+        return LLVMBuildBitCast(self, operand, dest_type, "");
+    }
+    extern fn LLVMBuildBitCast(*Builder, *Value, *Type, [*:0]const u8) *Value;
+
+    pub fn iCmp(self: *Builder, op: IntPredicate, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildICmp(self, op, lhs, rhs, "");
+    }
+    extern fn LLVMBuildICmp(*Builder, IntPredicate, *Value, *Value, [*:0]const u8) *Value;
+
+    pub fn fCmp(self: *Builder, op: RealPredicate, lhs: *Value, rhs: *Value) *Value {
+        return LLVMBuildFCmp(self, op, lhs, rhs, "");
+    }
+    extern fn LLVMBuildFCmp(*Builder, RealPredicate, *Value, *Value, [*:0]const u8) *Value;
+};
+
+pub const IntPredicate = enum(c_int) {
+    eq,
+    ne,
+    ugt,
+    uge,
+    ult,
+    ule,
+    sgt,
+    sge,
+    slt,
+    sle,
+};
+
+pub const RealPredicate = enum(c_int) {
+    false,
+    oeq,
+    ogt,
+    oge,
+    olt,
+    ole,
+    one,
+    ord,
+    uno,
+    ueq,
+    ugt,
+    uge,
+    ult,
+    ule,
+    une,
+    true,
 };

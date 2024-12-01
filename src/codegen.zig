@@ -12,11 +12,14 @@ pub fn compile(program: ir.Program, output_path: [*:0]const u8) !void {
     module.setTarget("x86_64-unknown-linux-gnu");
 
     const word_type: *llvm.Type = .int64(context);
+    const float_type: *llvm.Type = .double(context);
 
     const builder: *llvm.Builder = .init(context);
     defer builder.deinit();
 
-    for (program.functions) |function| compileFunction(function, module, builder, word_type);
+    for (program.functions) |function| {
+        compileFunction(function, module, builder, word_type, float_type);
+    }
 
     switch (builtin.mode) {
         .Debug, .ReleaseSafe => module.verify(),
@@ -31,6 +34,7 @@ fn compileFunction(
     module: *llvm.Module,
     builder: *llvm.Builder,
     word_type: *llvm.Type,
+    float_type: *llvm.Type,
 ) void {
     const max_parameters = std.math.maxInt(@TypeOf(function.parameter_count));
     const all_parameters: [max_parameters]*llvm.Type = @splat(word_type);
@@ -40,22 +44,32 @@ fn compileFunction(
     const l_function: *llvm.Function = .init(module, function.name, signature);
     const entry = l_function.appendBasicBlock();
     builder.positionAtEnd(entry);
-    compileStatement(function.body, builder);
+    compileStatement(function.body, builder, word_type, float_type);
 }
 
-fn compileStatement(statement: ir.Statement, builder: *llvm.Builder) void {
+fn compileStatement(
+    statement: ir.Statement,
+    builder: *llvm.Builder,
+    word_type: *llvm.Type,
+    float_type: *llvm.Type,
+) void {
     switch (statement) {
-        .compound => |it| for (it) |s| compileStatement(s, builder),
-        .expression => |it| _ = compileExpression(it, builder),
+        .compound => |it| for (it) |s| compileStatement(s, builder, word_type, float_type),
+        .expression => |it| _ = compileExpression(it, builder, word_type, float_type),
         .@"error" => unreachable,
     }
 }
 
-fn compileExpression(expression: ir.Expression, builder: *llvm.Builder) *llvm.Value {
+fn compileExpression(
+    expression: ir.Expression,
+    builder: *llvm.Builder,
+    word_type: *llvm.Type,
+    float_type: *llvm.Type,
+) *llvm.Value {
     return switch (expression) {
         .infix => |it| blk: {
-            const lhs = compileExpression(it.lhs.*, builder);
-            const rhs = compileExpression(it.rhs.*, builder);
+            const lhs = compileExpression(it.lhs.*, builder, word_type, float_type);
+            const rhs = compileExpression(it.rhs.*, builder, word_type, float_type);
             break :blk switch (it.operator) {
                 .@"=" => @panic("="),
                 .@"*=" => @panic("*="),
@@ -71,32 +85,68 @@ fn compileExpression(expression: ir.Expression, builder: *llvm.Builder) *llvm.Va
                 .@"?" => @panic("?"),
                 .@"||" => @panic("||"),
                 .@"&&" => @panic("&&"),
-                .@"==" => @panic("=="),
-                .@"!=" => @panic("!="),
-                .@"<" => @panic("<"),
-                .@"<=" => @panic("<="),
-                .@">" => @panic(">"),
-                .@">=" => @panic(">="),
-                .@"#==" => @panic("#=="),
-                .@"#!=" => @panic("#!="),
-                .@"#<" => @panic("#<"),
-                .@"#<=" => @panic("#<="),
-                .@"#>" => @panic("#>"),
-                .@"#>=" => @panic("#>="),
+                .@"==" => builder.zExt(builder.iCmp(.eq, lhs, rhs), word_type),
+                .@"!=" => builder.zExt(builder.iCmp(.ne, lhs, rhs), word_type),
+                .@"<" => builder.zExt(builder.iCmp(.slt, lhs, rhs), word_type),
+                .@"<=" => builder.zExt(builder.iCmp(.sle, lhs, rhs), word_type),
+                .@">" => builder.zExt(builder.iCmp(.sgt, lhs, rhs), word_type),
+                .@">=" => builder.zExt(builder.iCmp(.sge, lhs, rhs), word_type),
+                .@"#==" => builder.zExt(builder.fCmp(
+                    .oeq,
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#!=" => builder.zExt(builder.fCmp(
+                    .one,
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#<" => builder.zExt(builder.fCmp(
+                    .olt,
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#<=" => builder.zExt(builder.fCmp(
+                    .ole,
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#>" => builder.zExt(builder.fCmp(
+                    .ogt,
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#>=" => builder.zExt(builder.fCmp(
+                    .oge,
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
                 .@"+" => builder.add(lhs, rhs),
-                .@"-" => @panic("-"),
-                .@"#+" => @panic("#+"),
-                .@"#-" => @panic("#-"),
-                .@"*" => @panic("*"),
-                .@"/" => @panic("/"),
-                .@"%" => @panic("%"),
-                .@"#*" => @panic("#*"),
-                .@"#/" => @panic("#/"),
-                .@"|" => @panic("|"),
-                .@"^" => @panic("^"),
-                .@"&" => @panic("&"),
-                .@"<<" => @panic("<<"),
-                .@">>" => @panic(">>"),
+                .@"-" => builder.sub(lhs, rhs),
+                .@"#+" => builder.bitCast(builder.fAdd(
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#-" => builder.bitCast(builder.fSub(
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"*" => builder.mul(lhs, rhs),
+                .@"/" => builder.sDiv(lhs, rhs),
+                .@"%" => builder.sRem(lhs, rhs),
+                .@"#*" => builder.bitCast(builder.fMul(
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"#/" => builder.bitCast(builder.fDiv(
+                    builder.bitCast(lhs, float_type),
+                    builder.bitCast(rhs, float_type),
+                ), word_type),
+                .@"|" => builder.@"or"(lhs, rhs),
+                .@"^" => builder.xor(lhs, rhs),
+                .@"&" => builder.@"and"(lhs, rhs),
+                .@"<<" => builder.shl(lhs, rhs),
+                .@">>" => builder.lShr(lhs, rhs),
                 else => unreachable,
             };
         },
