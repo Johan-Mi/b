@@ -49,7 +49,7 @@ pub const Expression = union(enum) {
 pub const PrefixOperation = struct {
     syntax: Cst.Node,
 
-    const cast = CastImpl(@This(), .infix_operation).cast;
+    const cast = CastImpl(@This(), .prefix_operation).cast;
 
     pub const operand = ChildImpl(@This(), Expression).find;
 
