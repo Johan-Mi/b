@@ -305,7 +305,7 @@ fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) !void {
 
 const BindingPower = u5;
 
-fn prefixBindingPower(kind: SyntaxKind) ?BindingPower {
+pub fn prefixBindingPower(kind: SyntaxKind) ?BindingPower {
     return switch (kind) {
         .@"#", .@"##", .@"~", .@"-", .@"#-", .@"!", .@"*", .@"&", .@"++", .@"--", .@"@" => 23,
         else => null,

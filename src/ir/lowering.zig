@@ -70,6 +70,10 @@ fn lowerExpression(
     arena: std.mem.Allocator,
 ) error{OutOfMemory}!ir.Expression {
     return switch (expression) {
+        .prefix => |it| .{ .prefix = .{
+            .operator = it.operator(cst).?.kind(cst),
+            .operand = try box(arena, try lowerExpressionOpt(it.operand(cst), cst, arena)),
+        } },
         .infix => |it| .{ .infix = .{
             .lhs = try box(arena, try lowerExpressionOpt(it.lhs(cst), cst, arena)),
             .operator = it.operator(cst).?.kind(cst),

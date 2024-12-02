@@ -83,6 +83,29 @@ fn compileExpression(
     pointer_type: *llvm.Type,
 ) *llvm.Value {
     return switch (expression) {
+        .prefix => |it| blk: {
+            const operand = compileExpression(
+                it.operand.*,
+                builder,
+                word_type,
+                float_type,
+                pointer_type,
+            );
+            break :blk switch (it.operator) {
+                .@"#" => @panic("#"),
+                .@"##" => @panic("##"),
+                .@"~" => builder.not(operand),
+                .@"-" => @panic("-"),
+                .@"#-" => @panic("#-"),
+                .@"!" => @panic("!"),
+                .@"*" => @panic("*"),
+                .@"&" => @panic("&"),
+                .@"++" => @panic("++"),
+                .@"--" => @panic("--"),
+                .@"@" => @panic("@"),
+                else => unreachable,
+            };
+        },
         .infix => |it| blk: {
             const lhs = compileExpression(
                 it.lhs.*,

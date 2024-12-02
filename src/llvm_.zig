@@ -149,6 +149,11 @@ pub const Builder = opaque {
     }
     extern fn LLVMBuildXor(*Builder, *Value, *Value, [*:0]const u8) *Value;
 
+    pub fn not(self: *Builder, operand: *Value) *Value {
+        return LLVMBuildNot(self, operand, "");
+    }
+    extern fn LLVMBuildNot(*Builder, *Value, [*:0]const u8) *Value;
+
     pub fn store(self: *Builder, options: struct { value: *Value, to: *Value }) *Value {
         return LLVMBuildStore(self, options.value, options.to, "");
     }

@@ -18,6 +18,10 @@ pub const Statement = union(enum) {
 };
 
 pub const Expression = union(enum) {
+    prefix: struct {
+        operator: SyntaxKind,
+        operand: *Expression,
+    },
     infix: struct {
         lhs: *Expression,
         operator: SyntaxKind,

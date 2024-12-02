@@ -39,9 +39,25 @@ pub const ExpressionStatement = struct {
 };
 
 pub const Expression = union(enum) {
+    prefix: PrefixOperation,
     infix: InfixOperation,
 
     const cast = CastUnionEnumImpl(@This()).cast;
+};
+
+pub const PrefixOperation = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .infix_operation).cast;
+
+    pub const operand = ChildImpl(@This(), Expression).find;
+
+    pub fn operator(self: @This(), cst: Cst) ?Cst.Node {
+        var iterator = self.syntax.children(cst);
+        return while (iterator.next(cst)) |child| {
+            if (Parser.prefixBindingPower(child.kind(cst))) |_| break child;
+        } else null;
+    }
 };
 
 pub const InfixOperation = struct {
