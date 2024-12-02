@@ -92,12 +92,18 @@ fn compileExpression(
                 pointer_type,
             );
             break :blk switch (it.operator) {
-                .@"#" => @panic("#"),
-                .@"##" => @panic("##"),
+                .@"#" => builder.bitCast(builder.siToFp(operand, float_type), word_type),
+                .@"##" => builder.fpToSi(builder.bitCast(operand, float_type), word_type),
                 .@"~" => builder.not(operand),
-                .@"-" => @panic("-"),
-                .@"#-" => @panic("#-"),
-                .@"!" => @panic("!"),
+                .@"-" => builder.neg(operand),
+                .@"#-" => builder.bitCast(
+                    builder.fNeg(builder.bitCast(operand, float_type)),
+                    word_type,
+                ),
+                .@"!" => builder.zExt(
+                    builder.iCmp(.eq, operand, .int(word_type, 0, .signed)),
+                    word_type,
+                ),
                 .@"*" => @panic("*"),
                 .@"&" => @panic("&"),
                 .@"++" => @panic("++"),

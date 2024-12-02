@@ -1,4 +1,5 @@
 const std = @import("std");
+const Signedness = std.builtin.Signedness;
 
 pub const Context = opaque {
     pub const init = LLVMContextCreate;
@@ -67,7 +68,12 @@ pub const Type = opaque {
 
 pub const BasicBlock = opaque {};
 
-pub const Value = opaque {};
+pub const Value = opaque {
+    pub fn int(int_type: *Type, value: c_ulonglong, signedness: Signedness) *Value {
+        return LLVMConstInt(int_type, value, @intFromBool(signedness == .signed));
+    }
+    extern fn LLVMConstInt(*Type, c_ulonglong, c_int) *Value;
+};
 
 pub const Builder = opaque {
     pub const init = LLVMCreateBuilderInContext;
@@ -149,6 +155,16 @@ pub const Builder = opaque {
     }
     extern fn LLVMBuildXor(*Builder, *Value, *Value, [*:0]const u8) *Value;
 
+    pub fn neg(self: *Builder, operand: *Value) *Value {
+        return LLVMBuildNeg(self, operand, "");
+    }
+    extern fn LLVMBuildNeg(*Builder, *Value, [*:0]const u8) *Value;
+
+    pub fn fNeg(self: *Builder, operand: *Value) *Value {
+        return LLVMBuildFNeg(self, operand, "");
+    }
+    extern fn LLVMBuildFNeg(*Builder, *Value, [*:0]const u8) *Value;
+
     pub fn not(self: *Builder, operand: *Value) *Value {
         return LLVMBuildNot(self, operand, "");
     }
@@ -163,6 +179,16 @@ pub const Builder = opaque {
         return LLVMBuildZExt(self, operand, dest_type, "");
     }
     extern fn LLVMBuildZExt(*Builder, *Value, *Type, [*:0]const u8) *Value;
+
+    pub fn fpToSi(self: *Builder, operand: *Value, dest_type: *Type) *Value {
+        return LLVMBuildFPToSI(self, operand, dest_type, "");
+    }
+    extern fn LLVMBuildFPToSI(*Builder, *Value, *Type, [*:0]const u8) *Value;
+
+    pub fn siToFp(self: *Builder, operand: *Value, dest_type: *Type) *Value {
+        return LLVMBuildSIToFP(self, operand, dest_type, "");
+    }
+    extern fn LLVMBuildSIToFP(*Builder, *Value, *Type, [*:0]const u8) *Value;
 
     pub fn intToPtr(self: *Builder, operand: *Value, dest_type: *Type) *Value {
         return LLVMBuildIntToPtr(self, operand, dest_type, "");
