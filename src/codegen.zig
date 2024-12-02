@@ -13,12 +13,13 @@ pub fn compile(program: ir.Program, output_path: [*:0]const u8) !void {
 
     const word_type: *llvm.Type = .int64(context);
     const float_type: *llvm.Type = .double(context);
+    const pointer_type: *llvm.Type = .pointer(context, .{ .address_space = 0 });
 
     const builder: *llvm.Builder = .init(context);
     defer builder.deinit();
 
     for (program.functions) |function| {
-        compileFunction(function, module, builder, word_type, float_type);
+        compileFunction(function, module, builder, word_type, float_type, pointer_type);
     }
 
     switch (builtin.mode) {
@@ -35,6 +36,7 @@ fn compileFunction(
     builder: *llvm.Builder,
     word_type: *llvm.Type,
     float_type: *llvm.Type,
+    pointer_type: *llvm.Type,
 ) void {
     const max_parameters = std.math.maxInt(@TypeOf(function.parameter_count));
     const all_parameters: [max_parameters]*llvm.Type = @splat(word_type);
@@ -44,7 +46,7 @@ fn compileFunction(
     const l_function: *llvm.Function = .init(module, function.name, signature);
     const entry = l_function.appendBasicBlock();
     builder.positionAtEnd(entry);
-    compileStatement(function.body, builder, word_type, float_type);
+    compileStatement(function.body, builder, word_type, float_type, pointer_type);
 }
 
 fn compileStatement(
@@ -52,10 +54,23 @@ fn compileStatement(
     builder: *llvm.Builder,
     word_type: *llvm.Type,
     float_type: *llvm.Type,
+    pointer_type: *llvm.Type,
 ) void {
     switch (statement) {
-        .compound => |it| for (it) |s| compileStatement(s, builder, word_type, float_type),
-        .expression => |it| _ = compileExpression(it, builder, word_type, float_type),
+        .compound => |it| for (it) |s| compileStatement(
+            s,
+            builder,
+            word_type,
+            float_type,
+            pointer_type,
+        ),
+        .expression => |it| _ = compileExpression(
+            it,
+            builder,
+            word_type,
+            float_type,
+            pointer_type,
+        ),
         .@"error" => unreachable,
     }
 }
@@ -65,13 +80,29 @@ fn compileExpression(
     builder: *llvm.Builder,
     word_type: *llvm.Type,
     float_type: *llvm.Type,
+    pointer_type: *llvm.Type,
 ) *llvm.Value {
     return switch (expression) {
         .infix => |it| blk: {
-            const lhs = compileExpression(it.lhs.*, builder, word_type, float_type);
-            const rhs = compileExpression(it.rhs.*, builder, word_type, float_type);
+            const lhs = compileExpression(
+                it.lhs.*,
+                builder,
+                word_type,
+                float_type,
+                pointer_type,
+            );
+            const rhs = compileExpression(
+                it.rhs.*,
+                builder,
+                word_type,
+                float_type,
+                pointer_type,
+            );
             break :blk switch (it.operator) {
-                .@"=" => @panic("="),
+                .@"=" => {
+                    _ = builder.store(.{ .value = rhs, .to = builder.intToPtr(lhs, pointer_type) });
+                    break :blk rhs;
+                },
                 .@"*=" => @panic("*="),
                 .@"/=" => @panic("/="),
                 .@"%=" => @panic("%="),

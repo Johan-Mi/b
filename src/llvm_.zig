@@ -52,6 +52,11 @@ pub const Type = opaque {
     pub const double = LLVMDoubleTypeInContext;
     extern fn LLVMDoubleTypeInContext(*Context) *Type;
 
+    pub fn pointer(context: *Context, options: struct { address_space: c_uint }) *Type {
+        return LLVMPointerTypeInContext(context, options.address_space);
+    }
+    extern fn LLVMPointerTypeInContext(*Context, c_uint) *Type;
+
     pub fn function(parameters: []const *Type, return_type: *Type) *Type {
         const parameter_count = std.math.cast(c_uint, parameters.len) orelse
             @panic("too many parameters");
@@ -144,10 +149,20 @@ pub const Builder = opaque {
     }
     extern fn LLVMBuildXor(*Builder, *Value, *Value, [*:0]const u8) *Value;
 
+    pub fn store(self: *Builder, options: struct { value: *Value, to: *Value }) *Value {
+        return LLVMBuildStore(self, options.value, options.to, "");
+    }
+    extern fn LLVMBuildStore(*Builder, *Value, *Value, [*:0]const u8) *Value;
+
     pub fn zExt(self: *Builder, operand: *Value, dest_type: *Type) *Value {
         return LLVMBuildZExt(self, operand, dest_type, "");
     }
     extern fn LLVMBuildZExt(*Builder, *Value, *Type, [*:0]const u8) *Value;
+
+    pub fn intToPtr(self: *Builder, operand: *Value, dest_type: *Type) *Value {
+        return LLVMBuildIntToPtr(self, operand, dest_type, "");
+    }
+    extern fn LLVMBuildIntToPtr(*Builder, *Value, *Type, [*:0]const u8) *Value;
 
     pub fn bitCast(self: *Builder, operand: *Value, dest_type: *Type) *Value {
         return LLVMBuildBitCast(self, operand, dest_type, "");
