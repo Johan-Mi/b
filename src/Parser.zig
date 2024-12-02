@@ -208,9 +208,7 @@ fn parseAtom(self: *@This()) !void {
         else
             try self.parseVariable(),
         .number, .string_literal, .character_literal, .bcd_literal => {
-            try self.startNode(.literal);
             try self.bump();
-            try self.cst.finishNode();
         },
         .@"(" => try self.parseParenthesizedExpression(),
         else => try self.@"error"(),

@@ -93,7 +93,6 @@ pub const Kind = enum {
     @"while",
     expression_statement,
     variable,
-    literal,
     parenthesized_expression,
     function_call,
     arguments,
