@@ -210,6 +210,7 @@ fn compileExpression(
                 else => unreachable,
             };
         },
+        .number => |it| .int(word_type, @intCast(it), .signed),
         .@"error" => unreachable,
     };
 }

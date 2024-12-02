@@ -41,6 +41,7 @@ pub const ExpressionStatement = struct {
 pub const Expression = union(enum) {
     prefix: PrefixOperation,
     infix: InfixOperation,
+    number: Number,
 
     const cast = CastUnionEnumImpl(@This()).cast;
 };
@@ -82,6 +83,12 @@ pub const Rhs = struct {
     const cast = CastImpl(@This(), .rhs).cast;
 
     pub const expression = ChildImpl(@This(), Expression).find;
+};
+
+pub const Number = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .number).cast;
 };
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {
