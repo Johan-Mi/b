@@ -19,6 +19,7 @@ pub const Function = struct {
 
 pub const Statement = union(enum) {
     compound: CompoundStatement,
+    @"while": While,
     expression: ExpressionStatement,
 
     const cast = CastUnionEnumImpl(@This()).cast;
@@ -29,6 +30,14 @@ pub const CompoundStatement = struct {
 
     const cast = CastImpl(@This(), .compound_statement).cast;
     pub const statements = ChildrenImpl(@This(), Statement).init;
+};
+
+const While = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .@"while").cast;
+    pub const condition = ChildImpl(@This(), Expression).find;
+    pub const body = ChildImpl(@This(), Statement).find;
 };
 
 pub const ExpressionStatement = struct {

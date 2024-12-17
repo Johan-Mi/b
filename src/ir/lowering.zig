@@ -50,7 +50,7 @@ fn lowerStatement(
     arena: std.mem.Allocator,
     cst: Cst,
     diagnostics: *Diagnostics,
-) !ir.Statement {
+) error{OutOfMemory}!ir.Statement {
     return switch (statement) {
         .compound => |it| blk: {
             var iterator = it.statements(cst);
@@ -61,10 +61,23 @@ fn lowerStatement(
             }
             break :blk .{ .compound = statements };
         },
+        .@"while" => |it| .{ .@"while" = .{
+            .condition = try lowerExpressionOpt(it.condition(cst), cst, arena, diagnostics),
+            .body = try box(arena, try lowerStatementOpt(it.body(cst), cst, arena, diagnostics)),
+        } },
         .expression => |it| .{
             .expression = try lowerExpressionOpt(it.expression(cst), cst, arena, diagnostics),
         },
     };
+}
+
+fn lowerStatementOpt(
+    statement: ?ast.Statement,
+    cst: Cst,
+    arena: std.mem.Allocator,
+    diagnostics: *Diagnostics,
+) !ir.Statement {
+    return if (statement) |it| lowerStatement(it, arena, cst, diagnostics) else .@"error";
 }
 
 fn lowerExpression(

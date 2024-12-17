@@ -66,7 +66,10 @@ pub const Type = opaque {
     extern fn LLVMFunctionType(*Type, [*]const *Type, c_uint, is_variadic: bool) *Type;
 };
 
-pub const BasicBlock = opaque {};
+pub const BasicBlock = opaque {
+    pub const parent = LLVMGetBasicBlockParent;
+    extern fn LLVMGetBasicBlockParent(*BasicBlock) *Function;
+};
 
 pub const Value = opaque {
     pub fn int(int_type: *Type, value: c_ulonglong, signedness: Signedness) *Value {
@@ -84,6 +87,20 @@ pub const Builder = opaque {
 
     pub const positionAtEnd = LLVMPositionBuilderAtEnd;
     extern fn LLVMPositionBuilderAtEnd(*Builder, *BasicBlock) void;
+
+    pub const br = LLVMBuildBr;
+    extern fn LLVMBuildBr(*Builder, *BasicBlock) void;
+
+    pub fn condBr(
+        self: *Builder,
+        options: struct { @"if": *Value, then: *BasicBlock, @"else": *BasicBlock },
+    ) void {
+        LLVMBuildCondBr(self, options.@"if", options.then, options.@"else");
+    }
+    extern fn LLVMBuildCondBr(*Builder, *Value, *BasicBlock, *BasicBlock) void;
+
+    pub const basicBlock = LLVMGetInsertBlock;
+    extern fn LLVMGetInsertBlock(*Builder) *BasicBlock;
 
     pub fn add(self: *Builder, lhs: *Value, rhs: *Value) *Value {
         return LLVMBuildAdd(self, lhs, rhs, "");

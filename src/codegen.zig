@@ -64,6 +64,14 @@ fn compileStatement(
             float_type,
             pointer_type,
         ),
+        .@"while" => |it| compileWhile(
+            it.condition,
+            it.body.*,
+            builder,
+            word_type,
+            float_type,
+            pointer_type,
+        ),
         .expression => |it| _ = compileExpression(
             it,
             builder,
@@ -73,6 +81,27 @@ fn compileStatement(
         ),
         .@"error" => unreachable,
     }
+}
+
+fn compileWhile(
+    condition: ir.Expression,
+    body: ir.Statement,
+    builder: *llvm.Builder,
+    word_type: *llvm.Type,
+    float_type: *llvm.Type,
+    pointer_type: *llvm.Type,
+) void {
+    const function = builder.basicBlock().parent();
+    const check = function.appendBasicBlock();
+    builder.positionAtEnd(check);
+    const l_condition = compileExpression(condition, builder, word_type, float_type, pointer_type);
+    const then = function.appendBasicBlock();
+    const after = function.appendBasicBlock();
+    builder.condBr(.{ .@"if" = l_condition, .then = then, .@"else" = after });
+    builder.positionAtEnd(then);
+    compileStatement(body, builder, word_type, float_type, pointer_type);
+    builder.br(check);
+    builder.positionAtEnd(after);
 }
 
 fn compileExpression(
