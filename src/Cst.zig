@@ -48,8 +48,6 @@ pub const Node = enum(usize) {
     };
 };
 
-pub const Token = enum(usize) { _ };
-
 pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
     var nodes = self.nodes;
     nodes.deinit(allocator);
