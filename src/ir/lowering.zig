@@ -98,6 +98,15 @@ fn lowerExpression(
                 diagnostics,
             )),
         } },
+        .postfix => |it| .{ .postfix = .{
+            .operator = it.operator(cst).?.kind(cst),
+            .operand = try box(arena, try lowerExpressionOpt(
+                it.operand(cst),
+                cst,
+                arena,
+                diagnostics,
+            )),
+        } },
         .number => |it| if (std.fmt.parseInt(i64, it.syntax.source(cst), 10)) |n|
             .{ .number = n }
         else |_| blk: {

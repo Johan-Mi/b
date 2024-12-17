@@ -310,7 +310,7 @@ pub fn prefixBindingPower(kind: SyntaxKind) ?BindingPower {
     };
 }
 
-fn postfixBindingPower(kind: SyntaxKind) ?BindingPower {
+pub fn postfixBindingPower(kind: SyntaxKind) ?BindingPower {
     return switch (kind) {
         .@"++", .@"--" => 23,
         .@"[" => 25,

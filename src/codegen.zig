@@ -210,6 +210,22 @@ fn compileExpression(
                 else => unreachable,
             };
         },
+        .postfix => |it| blk: {
+            const operand = compileExpression(
+                it.operand.*,
+                builder,
+                word_type,
+                float_type,
+                pointer_type,
+            );
+            _ = operand; // autofix
+            break :blk switch (it.operator) {
+                .@"++" => @panic("++"),
+                .@"--" => @panic("--"),
+                .@"[" => @panic("["),
+                else => unreachable,
+            };
+        },
         .number => |it| .int(word_type, @intCast(it), .signed),
         .@"error" => unreachable,
     };

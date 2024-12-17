@@ -27,6 +27,10 @@ pub const Expression = union(enum) {
         operator: SyntaxKind,
         rhs: *Expression,
     },
+    postfix: struct {
+        operator: SyntaxKind,
+        operand: *Expression,
+    },
     number: i64,
 
     @"error",

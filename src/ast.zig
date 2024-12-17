@@ -41,6 +41,7 @@ pub const ExpressionStatement = struct {
 pub const Expression = union(enum) {
     prefix: PrefixOperation,
     infix: InfixOperation,
+    postfix: PostfixOperation,
     number: Number,
 
     const cast = CastUnionEnumImpl(@This()).cast;
@@ -73,6 +74,21 @@ pub const InfixOperation = struct {
         var iterator = self.syntax.children(cst);
         return while (iterator.next(cst)) |child| {
             if (Parser.infixBindingPower(child.kind(cst))) |_| break child;
+        } else null;
+    }
+};
+
+pub const PostfixOperation = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .postfix_operation).cast;
+
+    pub const operand = ChildImpl(@This(), Expression).find;
+
+    pub fn operator(self: @This(), cst: Cst) ?Cst.Node {
+        var iterator = self.syntax.children(cst);
+        return while (iterator.next(cst)) |child| {
+            if (Parser.postfixBindingPower(child.kind(cst))) |_| break child;
         } else null;
     }
 };
