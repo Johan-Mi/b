@@ -18,12 +18,26 @@ pub const Function = struct {
 };
 
 pub const Statement = union(enum) {
+    auto: Auto,
+    extrn: Extrn,
     compound: CompoundStatement,
     @"while": While,
     @"if": If,
     expression: ExpressionStatement,
 
     const cast = CastUnionEnumImpl(@This()).cast;
+};
+
+const Auto = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .auto).cast;
+};
+
+const Extrn = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .extrn).cast;
 };
 
 pub const CompoundStatement = struct {

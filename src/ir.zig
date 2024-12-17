@@ -23,6 +23,10 @@ pub const Statement = union(enum) {
     expression: Expression,
 
     @"error",
+
+    pub fn nop() @This() {
+        return .{ .compound = &.{} };
+    }
 };
 
 pub const Expression = union(enum) {
