@@ -52,7 +52,7 @@ fn lowerStatement(
     diagnostics: *Diagnostics,
 ) error{OutOfMemory}!ir.Statement {
     return switch (statement) {
-        .auto, .extrn => .nop(),
+        .auto, .extrn => .nop,
         .compound => |it| blk: {
             var iterator = it.statements(cst);
             const statements = try arena.alloc(ir.Statement, iterator.count(cst));
