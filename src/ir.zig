@@ -12,6 +12,10 @@ pub const Function = struct {
 
 pub const Statement = union(enum) {
     compound: []Statement,
+    @"if": struct {
+        condition: Expression,
+        body: *Statement,
+    },
     @"while": struct {
         condition: Expression,
         body: *Statement,

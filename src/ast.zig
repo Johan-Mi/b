@@ -20,6 +20,7 @@ pub const Function = struct {
 pub const Statement = union(enum) {
     compound: CompoundStatement,
     @"while": While,
+    @"if": If,
     expression: ExpressionStatement,
 
     const cast = CastUnionEnumImpl(@This()).cast;
@@ -36,6 +37,14 @@ const While = struct {
     syntax: Cst.Node,
 
     const cast = CastImpl(@This(), .@"while").cast;
+    pub const condition = ChildImpl(@This(), Expression).find;
+    pub const body = ChildImpl(@This(), Statement).find;
+};
+
+const If = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .@"if").cast;
     pub const condition = ChildImpl(@This(), Expression).find;
     pub const body = ChildImpl(@This(), Statement).find;
 };

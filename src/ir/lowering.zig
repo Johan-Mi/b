@@ -61,6 +61,10 @@ fn lowerStatement(
             }
             break :blk .{ .compound = statements };
         },
+        .@"if" => |it| .{ .@"if" = .{
+            .condition = try lowerExpressionOpt(it.condition(cst), cst, arena, diagnostics),
+            .body = try box(arena, try lowerStatementOpt(it.body(cst), cst, arena, diagnostics)),
+        } },
         .@"while" => |it| .{ .@"while" = .{
             .condition = try lowerExpressionOpt(it.condition(cst), cst, arena, diagnostics),
             .body = try box(arena, try lowerStatementOpt(it.body(cst), cst, arena, diagnostics)),
