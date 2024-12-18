@@ -283,6 +283,7 @@ fn compileExpression(
             };
         },
         .number => |it| .int(word_type, @intCast(it), .signed),
+        .variable => @panic("codegen variables"),
         .@"error" => unreachable,
     };
 }

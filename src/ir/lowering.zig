@@ -2,6 +2,7 @@ const ast = @import("../ast.zig");
 const Cst = @import("../Cst.zig");
 const Diagnostics = @import("../Diagnostic.zig").S;
 const ir = @import("../ir.zig");
+const Name = @import("../Name.zig");
 const std = @import("std");
 
 pub fn lower(
@@ -134,6 +135,19 @@ fn lowerExpression(
                 .span = it.syntax.source(cst),
             });
             break :blk .@"error";
+        },
+        .variable => |it| blk: {
+            const token = it.identifier(cst).?;
+            if (Name.resolve(token, cst)) |name| {
+                break :blk .{ .variable = name };
+            } else {
+                try diagnostics.emit(.{
+                    .level = .@"error",
+                    .message = "undeclared identifier",
+                    .span = token.source(cst),
+                });
+                break :blk .@"error";
+            }
         },
     };
 }

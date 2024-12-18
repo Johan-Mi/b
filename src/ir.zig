@@ -1,3 +1,4 @@
+const Name = @import("Name.zig");
 const SyntaxKind = @import("syntax.zig").Kind;
 
 pub const Program = struct {
@@ -42,6 +43,7 @@ pub const Expression = union(enum) {
         operand: *Expression,
     },
     number: i64,
+    variable: Name,
 
     @"error",
 };

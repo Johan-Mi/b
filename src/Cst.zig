@@ -6,6 +6,7 @@ const log = std.log.scoped(.cst);
 nodes: std.MultiArrayList(struct {
     source: ?[]const u8,
     kind: SyntaxKind,
+    parent: ?Node,
     /// Indices into `Cst.children`.
     children: struct { start: Start, count: usize },
 }),
@@ -26,6 +27,10 @@ pub const Node = enum(usize) {
 
     pub fn kind(self: @This(), cst: Cst) SyntaxKind {
         return cst.nodes.items(.kind)[@intFromEnum(self)];
+    }
+
+    pub fn parent(self: @This(), cst: Cst) ?@This() {
+        return cst.nodes.items(.parent)[@intFromEnum(self)];
     }
 
     pub fn children(self: @This(), cst: Cst) ChildIterator {
@@ -98,15 +103,19 @@ pub const Builder = struct {
             else
                 .token;
             const count = if (threaded_node.children) |c| c.items.len else 0;
+            const me = cst.nodes.len;
             try cst.nodes.append(allocator, .{
                 .source = threaded_node.source,
                 .kind = threaded_node.kind,
+                .parent = threaded_node.parent,
                 .children = .{ .start = start, .count = count },
             });
             _ = try cst.children.addManyAsSlice(allocator, count);
             if (threaded_node.children) |c| {
-                for (c.items, @intFromEnum(start)..) |child, index|
+                for (c.items, @intFromEnum(start)..) |child, index| {
+                    child.parent = @enumFromInt(me);
                     child.index = index;
+                }
             }
         }
 
@@ -116,6 +125,7 @@ pub const Builder = struct {
     const ThreadedNode = struct {
         source: ?[]const u8,
         kind: SyntaxKind,
+        parent: ?Node = null,
         /// Null iff this is a token.
         children: ?std.ArrayListUnmanaged(*@This()),
         next: ?*@This() = null,

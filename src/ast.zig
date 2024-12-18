@@ -28,22 +28,22 @@ pub const Statement = union(enum) {
     const cast = CastUnionEnumImpl(@This()).cast;
 };
 
-const Auto = struct {
+pub const Auto = struct {
     syntax: Cst.Node,
 
     const cast = CastImpl(@This(), .auto).cast;
 };
 
-const Extrn = struct {
+pub const Extrn = struct {
     syntax: Cst.Node,
 
-    const cast = CastImpl(@This(), .extrn).cast;
+    pub const cast = CastImpl(@This(), .extrn).cast;
 };
 
 pub const CompoundStatement = struct {
     syntax: Cst.Node,
 
-    const cast = CastImpl(@This(), .compound_statement).cast;
+    pub const cast = CastImpl(@This(), .compound_statement).cast;
     pub const statements = ChildrenImpl(@This(), Statement).init;
 };
 
@@ -75,6 +75,7 @@ pub const Expression = union(enum) {
     infix: InfixOperation,
     postfix: PostfixOperation,
     number: Number,
+    variable: Variable,
 
     const cast = CastUnionEnumImpl(@This()).cast;
 };
@@ -137,6 +138,13 @@ pub const Number = struct {
     syntax: Cst.Node,
 
     const cast = CastImpl(@This(), .number).cast;
+};
+
+pub const Variable = struct {
+    syntax: Cst.Node,
+
+    const cast = CastImpl(@This(), .variable).cast;
+    pub const identifier = ChildTokenImpl(@This(), .identifier).find;
 };
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {
