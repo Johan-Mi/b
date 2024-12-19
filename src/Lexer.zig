@@ -119,7 +119,11 @@ fn nonZero(n: anytype) ?@TypeOf(n) {
 }
 
 test "fuzz lexer" {
-    var input_bytes = std.testing.fuzzInput(.{});
+    try std.testing.fuzz(fuzzLexer, .{});
+}
+
+fn fuzzLexer(input: []const u8) !void {
+    var input_bytes = input;
     var lexer = init(input_bytes);
 
     // Token stream must match input.
