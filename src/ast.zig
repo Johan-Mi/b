@@ -76,8 +76,16 @@ pub const Expression = union(enum) {
     postfix: PostfixOperation,
     number: Number,
     variable: Variable,
+    parenthesized: Parenthesized,
 
     const cast = CastUnionEnumImpl(@This()).cast;
+
+    const Parenthesized = struct {
+        syntax: Cst.Node,
+
+        const cast = CastImpl(@This(), .parenthesized_expression).cast;
+        pub const inner = ChildImpl(@This(), Expression).find;
+    };
 };
 
 pub const PrefixOperation = struct {

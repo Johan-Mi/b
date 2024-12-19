@@ -149,6 +149,7 @@ fn lowerExpression(
                 break :blk .@"error";
             }
         },
+        .parenthesized => |it| lowerExpressionOpt(it.inner(cst), cst, arena, diagnostics),
     };
 }
 
