@@ -74,7 +74,8 @@ pub fn dump(self: @This()) void {
 }
 
 pub const Builder = struct {
-    events: std.ArrayList(Event),
+    events: std.ArrayListUnmanaged(Event) = .empty,
+    arena: std.mem.Allocator,
 
     const Event = union(enum) {
         open: SyntaxKind,
@@ -86,7 +87,7 @@ pub const Builder = struct {
     };
 
     pub fn init(arena: std.mem.Allocator) @This() {
-        return .{ .events = .init(arena) };
+        return .{ .arena = arena };
     }
 
     pub fn finish(self: @This(), allocator: std.mem.Allocator) !Cst {
@@ -137,7 +138,7 @@ pub const Builder = struct {
         var prev: ?*ThreadedNode = null;
         var events = self.events;
         std.debug.assert(events.pop() == .close);
-        const arena = events.allocator;
+        const arena = self.arena;
         for (events.items) |event| {
             switch (event) {
                 .open => |kind| {
@@ -165,15 +166,15 @@ pub const Builder = struct {
     }
 
     pub fn startNode(self: *@This(), kind: SyntaxKind) !void {
-        try self.events.append(.{ .open = kind });
+        try self.events.append(self.arena, .{ .open = kind });
     }
 
     pub fn finishNode(self: *@This()) !void {
-        try self.events.append(.close);
+        try self.events.append(self.arena, .close);
     }
 
     pub fn token(self: *@This(), kind: SyntaxKind, text: []const u8) !void {
-        try self.events.append(.{ .token = .{ .source = text, .kind = kind } });
+        try self.events.append(self.arena, .{ .token = .{ .source = text, .kind = kind } });
     }
 
     pub const Checkpoint = enum(usize) { _ };
@@ -183,6 +184,6 @@ pub const Builder = struct {
     }
 
     pub fn startNodeAt(self: *@This(), checkpoint: Checkpoint, kind: SyntaxKind) !void {
-        try self.events.insert(@intFromEnum(checkpoint), .{ .open = kind });
+        try self.events.insert(self.arena, @intFromEnum(checkpoint), .{ .open = kind });
     }
 };
