@@ -5,14 +5,13 @@ cst: Cst.Builder,
 pub fn parse(
     tokens: std.MultiArrayList(Token).Slice,
     arena: std.mem.Allocator,
-    cst_allocator: std.mem.Allocator,
 ) !Cst {
     var self: @This() = .{ .tokens = tokens, .cst = .init(arena) };
     try self.cst.startNode(.document);
     while (!self.at(.eof))
         try self.parseTopLevelItem();
     try self.cst.finishNode();
-    return self.cst.finish(cst_allocator);
+    return self.cst.finish(arena);
 }
 
 fn parseTopLevelItem(self: *@This()) !void {

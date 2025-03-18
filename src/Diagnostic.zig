@@ -12,26 +12,24 @@ pub fn @"error"(message: []const u8) @This() {
 
 pub const S = struct {
     diagnostics: std.MultiArrayList(Diagnostic) = .{},
-    gpa: std.mem.Allocator,
-    string_arena: std.mem.Allocator,
+    allocator: std.mem.Allocator,
     config: std.io.tty.Config,
     /// Must be assigned if any diagnostics have spans.
     source_code_start: [*]const u8 = undefined,
 
-    pub fn init(gpa: std.mem.Allocator, string_arena: std.mem.Allocator) @This() {
+    pub fn init(allocator: std.mem.Allocator) @This() {
         return .{
-            .gpa = gpa,
-            .string_arena = string_arena,
+            .allocator = allocator,
             .config = std.io.tty.detectConfig(std.io.getStdErr()),
         };
     }
 
     pub fn format(self: *@This(), comptime fmt: []const u8, args: anytype) ![]const u8 {
-        return try std.fmt.allocPrint(self.string_arena, fmt, args);
+        return try std.fmt.allocPrint(self.allocator, fmt, args);
     }
 
     pub fn emit(self: *@This(), diagnostic: Diagnostic) !void {
-        try self.diagnostics.append(self.gpa, diagnostic);
+        try self.diagnostics.append(self.allocator, diagnostic);
     }
 
     pub fn show(self: @This()) !void {
@@ -61,11 +59,6 @@ pub const S = struct {
 
     pub fn isOk(self: @This()) bool {
         return std.mem.indexOfScalar(Level, self.diagnostics.items(.level), .@"error") == null;
-    }
-
-    pub fn deinit(self: @This()) void {
-        var diagnostics = self.diagnostics;
-        diagnostics.deinit(self.gpa);
     }
 };
 

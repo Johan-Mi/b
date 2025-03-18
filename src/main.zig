@@ -1,16 +1,8 @@
-var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-
 pub fn main() !u8 {
-    const is_debug, const allocator = switch (builtin.mode) {
-        .Debug, .ReleaseSafe => .{ true, debug_allocator.allocator() },
-        .ReleaseFast, .ReleaseSmall => .{ false, std.heap.smp_allocator },
-    };
-    defer if (is_debug) std.debug.assert(debug_allocator.deinit() == .ok);
+    var arena: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
+    const allocator = arena.allocator();
 
-    var string_arena: std.heap.ArenaAllocator = .init(allocator);
-    defer string_arena.deinit();
-    var diagnostics: Diagnostic.S = .init(allocator, string_arena.allocator());
-    defer diagnostics.deinit();
+    var diagnostics: Diagnostic.S = .init(allocator);
 
     realMain(allocator, &diagnostics) catch |err| try diagnostics.emit(.@"error"(@errorName(err)));
 
@@ -39,13 +31,11 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
             return;
         };
     };
-    defer allocator.free(source_code);
 
     diagnostics.source_code_start = source_code.ptr;
 
     var lexer: Lexer = .init(source_code);
     var tokens: std.MultiArrayList(Lexer.Token) = .{};
-    defer tokens.deinit(allocator);
     while (lexer.next()) |token| {
         try tokens.append(allocator, token);
         switch (token.kind) {
@@ -73,27 +63,18 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         }
     }
 
-    const cst = blk: {
-        var arena: std.heap.ArenaAllocator = .init(allocator);
-        defer arena.deinit();
-        break :blk try Parser.parse(tokens.slice(), arena.allocator(), allocator);
-    };
-    defer cst.deinit(allocator);
+    const cst = try Parser.parse(tokens.slice(), allocator);
 
     if (std.process.hasEnvVarConstant("DUMP_CST")) cst.dump();
 
-    {
-        var arena: std.heap.ArenaAllocator = .init(allocator);
-        defer arena.deinit();
-        const program = try @import("ir/lowering.zig").lower(cst, arena.allocator(), diagnostics);
+    const program = try @import("ir/lowering.zig").lower(cst, allocator, diagnostics);
 
-        if (std.process.hasEnvVarConstant("DUMP_IR")) {
-            std.log.info("{}", .{std.json.fmt(program, .{})});
-        }
-
-        const output_file = try std.fs.cwd().createFile("main.bc", .{});
-        try @import("codegen.zig").compile(program, output_file, arena.allocator());
+    if (std.process.hasEnvVarConstant("DUMP_IR")) {
+        std.log.info("{}", .{std.json.fmt(program, .{})});
     }
+
+    const output_file = try std.fs.cwd().createFile("main.bc", .{});
+    try @import("codegen.zig").compile(program, output_file, allocator);
 }
 
 test {

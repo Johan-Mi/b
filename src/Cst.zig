@@ -48,13 +48,6 @@ pub const Node = enum(usize) {
     };
 };
 
-pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
-    var nodes = self.nodes;
-    nodes.deinit(allocator);
-    var children = self.children;
-    children.deinit(allocator);
-}
-
 pub fn dump(self: @This()) void {
     const nodes = self.nodes.slice();
     for (0.., nodes.items(.kind), nodes.items(.children)) |i, kind, children| {
@@ -89,7 +82,6 @@ pub const Builder = struct {
         var threaded_tree: ?*ThreadedNode = try self.intoThreadedTree();
 
         var cst: Cst = .{ .nodes = .{}, .children = .{} };
-        errdefer cst.deinit(allocator);
 
         while (threaded_tree) |threaded_node| : (threaded_tree = threaded_node.next) {
             if (threaded_node.index) |index|
