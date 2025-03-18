@@ -15,11 +15,15 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "b",
+    const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = "b",
+        .root_module = mod,
     });
     const llvm_config = b.run(&.{ "llvm-config", "--libdir" });
     const path = std.mem.trimRight(u8, llvm_config, "\n");
