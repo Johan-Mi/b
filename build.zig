@@ -25,11 +25,6 @@ pub fn build(b: *std.Build) void {
         .name = "b",
         .root_module = mod,
     });
-    const llvm_config = b.run(&.{ "llvm-config", "--libdir" });
-    const path = std.mem.trimRight(u8, llvm_config, "\n");
-    exe.addLibraryPath(.{ .cwd_relative = path });
-    exe.linkSystemLibrary("LLVM");
-    exe.linkLibC();
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -64,9 +59,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    unit_tests.addLibraryPath(.{ .cwd_relative = path });
-    unit_tests.linkSystemLibrary("LLVM");
-    unit_tests.linkLibC();
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

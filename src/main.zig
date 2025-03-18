@@ -91,7 +91,8 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
             std.log.info("{}", .{std.json.fmt(program, .{})});
         }
 
-        try @import("codegen.zig").compile(program, "main.bc");
+        const output_file = try std.fs.cwd().createFile("main.bc", .{});
+        try @import("codegen.zig").compile(program, output_file, arena.allocator());
     }
 }
 

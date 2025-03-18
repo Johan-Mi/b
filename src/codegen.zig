@@ -1,87 +1,47 @@
-pub fn compile(program: ir.Program, output_path: [*:0]const u8) !void {
-    const context: *llvm.Context = .init();
-    defer context.deinit();
+pub fn compile(
+    program: ir.Program,
+    output_file: std.fs.File,
+    arena: std.mem.Allocator,
+) !void {
+    var builder: llvm.Builder = try .init(.{ .allocator = arena });
 
-    const module: *llvm.Module = .init(context);
-    defer module.deinit();
-    module.setTarget("x86_64-unknown-linux-gnu");
+    for (program.functions) |function| try compileFunction(function, &builder);
 
-    const word_type: *llvm.Type = .int64(context);
-    const float_type: *llvm.Type = .double(context);
-    const pointer_type: *llvm.Type = .pointer(context, .{ .address_space = 0 });
-
-    const builder: *llvm.Builder = .init(context);
-    defer builder.deinit();
-
-    for (program.functions) |function| {
-        compileFunction(function, module, builder, word_type, float_type, pointer_type);
-    }
-
-    switch (builtin.mode) {
-        .Debug, .ReleaseSafe => module.verify(),
-        .ReleaseFast, .ReleaseSmall => {},
-    }
-
-    try module.write(output_path);
+    const bitcode = try builder.toBitcode(arena, .{
+        .name = "b",
+        .version = .{ .major = 0, .minor = 0, .patch = 0 },
+    });
+    try output_file.writeAll(std.mem.sliceAsBytes(bitcode));
 }
 
 fn compileFunction(
     function: ir.Function,
-    module: *llvm.Module,
     builder: *llvm.Builder,
-    word_type: *llvm.Type,
-    float_type: *llvm.Type,
-    pointer_type: *llvm.Type,
-) void {
+) !void {
     const max_parameters = std.math.maxInt(@TypeOf(function.parameter_count));
-    const all_parameters: [max_parameters]*llvm.Type = @splat(word_type);
+    const all_parameters: [max_parameters]llvm.Builder.Type = @splat(.i64);
     const parameters = all_parameters[0..function.parameter_count];
-    const return_type = word_type;
-    const signature: *llvm.Type = .function(parameters, return_type);
-    const l_function: *llvm.Function = .init(module, function.name, signature);
-    const entry = l_function.appendBasicBlock();
-    builder.positionAtEnd(entry);
-    compileStatement(function.body, builder, word_type, float_type, pointer_type);
+    const return_type: llvm.Builder.Type = .i64;
+    const signature = try builder.fnType(return_type, parameters, .normal);
+    const l_function = try builder.addFunction(signature, .empty, .default);
+    var wip_function: llvm.Builder.WipFunction = try .init(builder, .{
+        .function = l_function,
+        .strip = true,
+    });
+    const entry = try wip_function.block(0, "");
+    wip_function.cursor = .{ .block = entry };
+    try compileStatement(function.body, &wip_function);
 }
 
 fn compileStatement(
     statement: ir.Statement,
-    builder: *llvm.Builder,
-    word_type: *llvm.Type,
-    float_type: *llvm.Type,
-    pointer_type: *llvm.Type,
-) void {
+    function: *llvm.Builder.WipFunction,
+) error{OutOfMemory}!void {
     switch (statement) {
-        .compound => |it| for (it) |s| compileStatement(
-            s,
-            builder,
-            word_type,
-            float_type,
-            pointer_type,
-        ),
-        .@"if" => |it| compileIf(
-            it.condition,
-            it.body.*,
-            builder,
-            word_type,
-            float_type,
-            pointer_type,
-        ),
-        .@"while" => |it| compileWhile(
-            it.condition,
-            it.body.*,
-            builder,
-            word_type,
-            float_type,
-            pointer_type,
-        ),
-        .expression => |it| _ = compileExpression(
-            it,
-            builder,
-            word_type,
-            float_type,
-            pointer_type,
-        ),
+        .compound => |it| for (it) |s| try compileStatement(s, function),
+        .@"if" => |it| try compileIf(it.condition, it.body.*, function),
+        .@"while" => |it| try compileWhile(it.condition, it.body.*, function),
+        .expression => |it| _ = try compileExpression(it, function),
         .@"error" => unreachable,
     }
 }
@@ -89,71 +49,69 @@ fn compileStatement(
 fn compileIf(
     condition: ir.Expression,
     body: ir.Statement,
-    builder: *llvm.Builder,
-    word_type: *llvm.Type,
-    float_type: *llvm.Type,
-    pointer_type: *llvm.Type,
-) void {
-    const function = builder.basicBlock().parent();
-    const l_condition = compileExpression(condition, builder, word_type, float_type, pointer_type);
-    const then = function.appendBasicBlock();
-    const after = function.appendBasicBlock();
-    builder.condBr(.{ .@"if" = l_condition, .then = then, .@"else" = after });
-    builder.positionAtEnd(then);
-    compileStatement(body, builder, word_type, float_type, pointer_type);
-    builder.br(after);
-    builder.positionAtEnd(after);
+    function: *llvm.Builder.WipFunction,
+) !void {
+    const l_condition = try compileExpression(condition, function);
+    const then = try function.block(1, "");
+    const after = try function.block(2, "");
+    _ = try function.brCond(l_condition, then, after, .none);
+    function.cursor = .{ .block = then };
+    try compileStatement(body, function);
+    _ = try function.br(after);
+    function.cursor = .{ .block = after };
 }
 
 fn compileWhile(
     condition: ir.Expression,
     body: ir.Statement,
-    builder: *llvm.Builder,
-    word_type: *llvm.Type,
-    float_type: *llvm.Type,
-    pointer_type: *llvm.Type,
-) void {
-    const function = builder.basicBlock().parent();
-    const check = function.appendBasicBlock();
-    builder.positionAtEnd(check);
-    const l_condition = compileExpression(condition, builder, word_type, float_type, pointer_type);
-    const then = function.appendBasicBlock();
-    const after = function.appendBasicBlock();
-    builder.condBr(.{ .@"if" = l_condition, .then = then, .@"else" = after });
-    builder.positionAtEnd(then);
-    compileStatement(body, builder, word_type, float_type, pointer_type);
-    builder.br(check);
-    builder.positionAtEnd(after);
+    function: *llvm.Builder.WipFunction,
+) !void {
+    const check = try function.block(2, "");
+    _ = try function.br(check);
+    function.cursor = .{ .block = check };
+    const l_condition = try compileExpression(condition, function);
+    const then = try function.block(1, "");
+    const after = try function.block(1, "");
+    _ = try function.brCond(l_condition, then, after, .none);
+    function.cursor = .{ .block = then };
+    try compileStatement(body, function);
+    _ = try function.br(check);
+    function.cursor = .{ .block = after };
 }
 
 fn compileExpression(
     expression: ir.Expression,
-    builder: *llvm.Builder,
-    word_type: *llvm.Type,
-    float_type: *llvm.Type,
-    pointer_type: *llvm.Type,
-) *llvm.Value {
+    function: *llvm.Builder.WipFunction,
+) !llvm.Builder.Value {
     return switch (expression) {
         .prefix => |it| blk: {
-            const operand = compileExpression(
-                it.operand.*,
-                builder,
-                word_type,
-                float_type,
-                pointer_type,
-            );
+            const operand = try compileExpression(it.operand.*, function);
             break :blk switch (it.operator) {
-                .@"#" => builder.bitCast(builder.siToFp(operand, float_type), word_type),
-                .@"##" => builder.fpToSi(builder.bitCast(operand, float_type), word_type),
-                .@"~" => builder.not(operand),
-                .@"-" => builder.neg(operand),
-                .@"#-" => builder.bitCast(
-                    builder.fNeg(builder.bitCast(operand, float_type)),
-                    word_type,
+                .@"#" => function.cast(
+                    .bitcast,
+                    try function.cast(.sitofp, operand, .double, ""),
+                    .i64,
+                    "",
                 ),
-                .@"!" => builder.zExt(
-                    builder.iCmp(.eq, operand, .int(word_type, 0, .signed)),
-                    word_type,
+                .@"##" => function.cast(
+                    .fptosi,
+                    try function.cast(.bitcast, operand, .double, ""),
+                    .i64,
+                    "",
+                ),
+                .@"~" => function.not(operand, ""),
+                .@"-" => function.neg(operand, ""),
+                .@"#-" => function.cast(
+                    .bitcast,
+                    try function.un(.fneg, try function.cast(.bitcast, operand, .double, ""), ""),
+                    .i64,
+                    "",
+                ),
+                .@"!" => function.cast(
+                    .zext,
+                    try function.icmp(.eq, operand, .@"0", ""),
+                    .i64,
+                    "",
                 ),
                 .@"*" => @panic("*"),
                 .@"&" => @panic("&"),
@@ -164,23 +122,12 @@ fn compileExpression(
             };
         },
         .infix => |it| blk: {
-            const lhs = compileExpression(
-                it.lhs.*,
-                builder,
-                word_type,
-                float_type,
-                pointer_type,
-            );
-            const rhs = compileExpression(
-                it.rhs.*,
-                builder,
-                word_type,
-                float_type,
-                pointer_type,
-            );
+            const lhs = try compileExpression(it.lhs.*, function);
+            const rhs = try compileExpression(it.rhs.*, function);
             break :blk switch (it.operator) {
                 .@"=" => {
-                    _ = builder.store(.{ .value = rhs, .to = builder.intToPtr(lhs, pointer_type) });
+                    const dest = try function.cast(.inttoptr, lhs, .ptr, "");
+                    _ = try function.store(.normal, rhs, dest, .default);
                     break :blk rhs;
                 },
                 .@"*=" => @panic("*="),
@@ -196,79 +143,93 @@ fn compileExpression(
                 .@"?" => @panic("?"),
                 .@"||" => @panic("||"),
                 .@"&&" => @panic("&&"),
-                .@"==" => builder.zExt(builder.iCmp(.eq, lhs, rhs), word_type),
-                .@"!=" => builder.zExt(builder.iCmp(.ne, lhs, rhs), word_type),
-                .@"<" => builder.zExt(builder.iCmp(.slt, lhs, rhs), word_type),
-                .@"<=" => builder.zExt(builder.iCmp(.sle, lhs, rhs), word_type),
-                .@">" => builder.zExt(builder.iCmp(.sgt, lhs, rhs), word_type),
-                .@">=" => builder.zExt(builder.iCmp(.sge, lhs, rhs), word_type),
-                .@"#==" => builder.zExt(builder.fCmp(
+                .@"==" => function.cast(.zext, try function.icmp(.eq, lhs, rhs, ""), .i64, ""),
+                .@"!=" => function.cast(.zext, try function.icmp(.ne, lhs, rhs, ""), .i64, ""),
+                .@"<" => function.cast(.zext, try function.icmp(.slt, lhs, rhs, ""), .i64, ""),
+                .@"<=" => function.cast(.zext, try function.icmp(.sle, lhs, rhs, ""), .i64, ""),
+                .@">" => function.cast(.zext, try function.icmp(.sgt, lhs, rhs, ""), .i64, ""),
+                .@">=" => function.cast(.zext, try function.icmp(.sge, lhs, rhs, ""), .i64, ""),
+                .@"#==" => function.cast(.zext, try function.fcmp(
+                    .normal,
                     .oeq,
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#!=" => builder.zExt(builder.fCmp(
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#!=" => function.cast(.zext, try function.fcmp(
+                    .normal,
                     .one,
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#<" => builder.zExt(builder.fCmp(
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#<" => function.cast(.zext, try function.fcmp(
+                    .normal,
                     .olt,
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#<=" => builder.zExt(builder.fCmp(
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#<=" => function.cast(.zext, try function.fcmp(
+                    .normal,
                     .ole,
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#>" => builder.zExt(builder.fCmp(
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#>" => function.cast(.zext, try function.fcmp(
+                    .normal,
                     .ogt,
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#>=" => builder.zExt(builder.fCmp(
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#>=" => function.cast(.zext, try function.fcmp(
+                    .normal,
                     .oge,
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"+" => builder.add(lhs, rhs),
-                .@"-" => builder.sub(lhs, rhs),
-                .@"#+" => builder.bitCast(builder.fAdd(
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#-" => builder.bitCast(builder.fSub(
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"*" => builder.mul(lhs, rhs),
-                .@"/" => builder.sDiv(lhs, rhs),
-                .@"%" => builder.sRem(lhs, rhs),
-                .@"#*" => builder.bitCast(builder.fMul(
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"#/" => builder.bitCast(builder.fDiv(
-                    builder.bitCast(lhs, float_type),
-                    builder.bitCast(rhs, float_type),
-                ), word_type),
-                .@"|" => builder.@"or"(lhs, rhs),
-                .@"^" => builder.xor(lhs, rhs),
-                .@"&" => builder.@"and"(lhs, rhs),
-                .@"<<" => builder.shl(lhs, rhs),
-                .@">>" => builder.lShr(lhs, rhs),
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"+" => function.bin(.add, lhs, rhs, ""),
+                .@"-" => function.bin(.sub, lhs, rhs, ""),
+                .@"#+" => function.cast(.bitcast, try function.bin(
+                    .fadd,
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#-" => function.cast(.bitcast, try function.bin(
+                    .fsub,
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"*" => function.bin(.mul, lhs, rhs, ""),
+                .@"/" => function.bin(.sdiv, lhs, rhs, ""),
+                .@"%" => function.bin(.srem, lhs, rhs, ""),
+                .@"#*" => function.cast(.bitcast, try function.bin(
+                    .fmul,
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"#/" => function.cast(.bitcast, try function.bin(
+                    .fdiv,
+                    try function.cast(.bitcast, lhs, .double, ""),
+                    try function.cast(.bitcast, rhs, .double, ""),
+                    "",
+                ), .i64, ""),
+                .@"|" => function.bin(.@"or", lhs, rhs, ""),
+                .@"^" => function.bin(.xor, lhs, rhs, ""),
+                .@"&" => function.bin(.@"and", lhs, rhs, ""),
+                .@"<<" => function.bin(.shl, lhs, rhs, ""),
+                .@">>" => function.bin(.lshr, lhs, rhs, ""),
                 else => unreachable,
             };
         },
         .postfix => |it| blk: {
-            const operand = compileExpression(
-                it.operand.*,
-                builder,
-                word_type,
-                float_type,
-                pointer_type,
-            );
+            const operand = try compileExpression(it.operand.*, function);
             _ = operand; // autofix
             break :blk switch (it.operator) {
                 .@"++" => @panic("++"),
@@ -277,7 +238,7 @@ fn compileExpression(
                 else => unreachable,
             };
         },
-        .number => |it| .int(word_type, @intCast(it), .signed),
+        .number => |it| function.builder.intValue(.i64, it),
         .variable => @panic("codegen variables"),
         .@"error" => unreachable,
     };
@@ -285,5 +246,5 @@ fn compileExpression(
 
 const builtin = @import("builtin");
 const ir = @import("ir.zig");
-const llvm = @import("llvm_.zig");
 const std = @import("std");
+const llvm = std.zig.llvm;

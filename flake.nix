@@ -20,7 +20,7 @@
         src = cleanSource ./.;
 
         nativeBuildInputs = with env.pkgs; [];
-        buildInputs = with env.pkgsForTarget target; [ libllvm ];
+        buildInputs = with env.pkgsForTarget target; [];
 
         # Smaller binaries and avoids shipping glibc.
         zigPreferMusl = true;

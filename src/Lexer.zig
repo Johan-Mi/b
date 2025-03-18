@@ -116,10 +116,10 @@ fn nonZero(n: anytype) ?@TypeOf(n) {
 }
 
 test "fuzz lexer" {
-    try std.testing.fuzz(fuzzLexer, .{});
+    try std.testing.fuzz({}, fuzzLexer, .{});
 }
 
-fn fuzzLexer(input: []const u8) !void {
+fn fuzzLexer(_: void, input: []const u8) !void {
     var input_bytes = input;
     var lexer = init(input_bytes);
 

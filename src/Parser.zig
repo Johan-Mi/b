@@ -450,10 +450,10 @@ fn peekNth(self: @This(), n: usize) SyntaxKind {
 }
 
 test "fuzz parser" {
-    try std.testing.fuzz(fuzzParser, .{});
+    try std.testing.fuzz({}, fuzzParser, .{});
 }
 
-fn fuzzParser(input_bytes: []const u8) !void {
+fn fuzzParser(_: void, input_bytes: []const u8) !void {
     var lexer: @import("Lexer.zig") = .init(input_bytes);
     var tokens: std.MultiArrayList(Token) = .{};
     defer tokens.deinit(std.testing.allocator);
