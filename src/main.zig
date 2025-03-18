@@ -26,10 +26,9 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
 
         const me = if (1 <= args.len) args[0] else "b";
         if (args.len != 2) {
-            if (args.len < 2)
-                try diagnostics.emit(.@"error"("no source file provided"));
-            if (3 <= args.len)
-                try diagnostics.emit(.@"error"("too many command line arguments"));
+            try diagnostics.emit(.@"error"(
+                if (args.len < 2) "no source file provided" else "too many command line arguments",
+            ));
             const usage = try diagnostics.format("usage: {s} SOURCE.b", .{me});
             return try diagnostics.emit(.note(usage));
         }
