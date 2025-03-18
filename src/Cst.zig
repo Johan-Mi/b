@@ -1,8 +1,3 @@
-const Cst = @This();
-const std = @import("std");
-const SyntaxKind = @import("syntax.zig").Kind;
-const log = std.log.scoped(.cst);
-
 nodes: std.MultiArrayList(struct {
     source: ?[]const u8,
     kind: SyntaxKind,
@@ -187,3 +182,8 @@ pub const Builder = struct {
         try self.events.insert(self.arena, @intFromEnum(checkpoint), .{ .open = kind });
     }
 };
+
+const Cst = @This();
+const std = @import("std");
+const SyntaxKind = @import("syntax.zig").Kind;
+const log = std.log.scoped(.cst);

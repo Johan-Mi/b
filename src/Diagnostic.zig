@@ -1,7 +1,3 @@
-const std = @import("std");
-
-const Diagnostic = @This();
-
 level: Level,
 message: []const u8,
 span: ?[]const u8 = null,
@@ -77,3 +73,7 @@ const Level = enum {
     note,
     @"error",
 };
+
+const std = @import("std");
+
+const Diagnostic = @This();

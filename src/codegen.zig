@@ -1,8 +1,3 @@
-const builtin = @import("builtin");
-const ir = @import("ir.zig");
-const llvm = @import("llvm_.zig");
-const std = @import("std");
-
 pub fn compile(program: ir.Program, output_path: [*:0]const u8) !void {
     const context: *llvm.Context = .init();
     defer context.deinit();
@@ -287,3 +282,8 @@ fn compileExpression(
         .@"error" => unreachable,
     };
 }
+
+const builtin = @import("builtin");
+const ir = @import("ir.zig");
+const llvm = @import("llvm_.zig");
+const std = @import("std");

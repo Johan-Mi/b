@@ -1,10 +1,3 @@
-const ast = @import("../ast.zig");
-const Cst = @import("../Cst.zig");
-const Diagnostics = @import("../Diagnostic.zig").S;
-const ir = @import("../ir.zig");
-const Name = @import("../Name.zig");
-const std = @import("std");
-
 pub fn lower(
     cst: Cst,
     arena: std.mem.Allocator,
@@ -167,3 +160,10 @@ fn box(allocator: std.mem.Allocator, value: anytype) !*@TypeOf(value) {
     slot.* = value;
     return slot;
 }
+
+const ast = @import("../ast.zig");
+const Cst = @import("../Cst.zig");
+const Diagnostics = @import("../Diagnostic.zig").S;
+const ir = @import("../ir.zig");
+const Name = @import("../Name.zig");
+const std = @import("std");

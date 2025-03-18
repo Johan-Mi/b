@@ -1,6 +1,3 @@
-const Name = @import("Name.zig");
-const SyntaxKind = @import("syntax.zig").Kind;
-
 pub const Program = struct {
     functions: []const Function,
 };
@@ -47,3 +44,6 @@ pub const Expression = union(enum) {
 
     @"error",
 };
+
+const Name = @import("Name.zig");
+const SyntaxKind = @import("syntax.zig").Kind;

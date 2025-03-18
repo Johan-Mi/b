@@ -1,7 +1,3 @@
-const ast = @import("ast.zig");
-const Cst = @import("Cst.zig");
-const std = @import("std");
-
 node: Cst.Node,
 
 pub fn resolve(token: Cst.Node, cst: Cst) ?@This() {
@@ -32,3 +28,7 @@ pub fn resolve(token: Cst.Node, cst: Cst) ?@This() {
         }
     } else null;
 }
+
+const ast = @import("ast.zig");
+const Cst = @import("Cst.zig");
+const std = @import("std");

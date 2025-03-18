@@ -1,8 +1,3 @@
-const Diagnostic = @import("Diagnostic.zig");
-const Lexer = @import("Lexer.zig");
-const Parser = @import("Parser.zig");
-const std = @import("std");
-
 pub fn main() !u8 {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
     defer std.debug.assert(gpa.deinit() == .ok);
@@ -99,3 +94,8 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
 test {
     std.testing.refAllDecls(@This());
 }
+
+const Diagnostic = @import("Diagnostic.zig");
+const Lexer = @import("Lexer.zig");
+const Parser = @import("Parser.zig");
+const std = @import("std");

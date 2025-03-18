@@ -1,6 +1,3 @@
-const std = @import("std");
-const Signedness = std.builtin.Signedness;
-
 pub const Context = opaque {
     pub const init = LLVMContextCreate;
     extern fn LLVMContextCreate() *Context;
@@ -259,3 +256,6 @@ pub const RealPredicate = enum(c_int) {
     une,
     true,
 };
+
+const std = @import("std");
+const Signedness = std.builtin.Signedness;

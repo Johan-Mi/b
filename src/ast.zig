@@ -1,7 +1,3 @@
-const Parser = @import("Parser.zig");
-const Cst = @import("Cst.zig");
-const SyntaxKind = @import("syntax.zig").Kind;
-
 pub const Document = struct {
     syntax: Cst.Node,
 
@@ -218,3 +214,7 @@ fn ChildrenImpl(Self: type, Child: type) type {
         }
     };
 }
+
+const Parser = @import("Parser.zig");
+const Cst = @import("Cst.zig");
+const SyntaxKind = @import("syntax.zig").Kind;

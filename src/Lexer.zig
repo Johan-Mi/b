@@ -1,6 +1,3 @@
-const std = @import("std");
-const SyntaxKind = @import("syntax.zig").Kind;
-
 source_code: []const u8,
 
 pub fn init(source_code: []const u8) @This() {
@@ -133,3 +130,6 @@ fn fuzzLexer(input: []const u8) !void {
     }
     try std.testing.expectEqualStrings("", input_bytes);
 }
+
+const std = @import("std");
+const SyntaxKind = @import("syntax.zig").Kind;

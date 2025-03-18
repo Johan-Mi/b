@@ -1,8 +1,3 @@
-const Cst = @import("Cst.zig");
-const std = @import("std");
-const SyntaxKind = @import("syntax.zig").Kind;
-const Token = @import("Lexer.zig").Token;
-
 tokens: std.MultiArrayList(Token).Slice,
 index: usize = 0,
 cst: Cst.Builder,
@@ -473,3 +468,8 @@ fn fuzzParser(input_bytes: []const u8) !void {
     const cst = try parse(tokens.slice(), arena.allocator(), std.testing.allocator);
     defer cst.deinit(std.testing.allocator);
 }
+
+const Cst = @import("Cst.zig");
+const std = @import("std");
+const SyntaxKind = @import("syntax.zig").Kind;
+const Token = @import("Lexer.zig").Token;
