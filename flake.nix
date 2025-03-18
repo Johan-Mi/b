@@ -11,7 +11,7 @@
       # Zig flake helper
       # Check the flake.nix in zig2nix project for more options:
       # <https://github.com/Cloudef/zig2nix/blob/master/flake.nix>
-      env = zig2nix.outputs.zig-env.${system} { zig = zig2nix.outputs.packages.${system}.zig.master.bin; };
+      env = zig2nix.outputs.zig-env.${system} { zig = zig2nix.outputs.packages.${system}.zig-0_14_0; };
       system-triple = env.lib.zigTripleFromString system;
     in with builtins; with env.lib; with env.pkgs.lib; rec {
       # nix build .#target.{zig-target}

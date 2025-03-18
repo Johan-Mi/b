@@ -132,7 +132,7 @@ pub const Builder = struct {
         var stack: std.ArrayListUnmanaged(*ThreadedNode) = .empty;
         var prev: ?*ThreadedNode = null;
         var events = self.events;
-        std.debug.assert(events.pop() == .close);
+        std.debug.assert(events.pop().? == .close);
         const arena = self.arena;
         for (events.items) |event| {
             switch (event) {
@@ -151,7 +151,7 @@ pub const Builder = struct {
                     try stack.items[stack.items.len - 1].children.?.append(arena, node);
                 },
                 .close => {
-                    const child = stack.pop();
+                    const child = stack.pop().?;
                     try stack.items[stack.items.len - 1].children.?.append(arena, child);
                 },
             }

@@ -1,7 +1,11 @@
+var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+
 pub fn main() !u8 {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
-    defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
+    const is_debug, const allocator = switch (builtin.mode) {
+        .Debug, .ReleaseSafe => .{ true, debug_allocator.allocator() },
+        .ReleaseFast, .ReleaseSmall => .{ false, std.heap.smp_allocator },
+    };
+    defer if (is_debug) std.debug.assert(debug_allocator.deinit() == .ok);
 
     var string_arena: std.heap.ArenaAllocator = .init(allocator);
     defer string_arena.deinit();
@@ -95,6 +99,7 @@ test {
     std.testing.refAllDecls(@This());
 }
 
+const builtin = @import("builtin");
 const Diagnostic = @import("Diagnostic.zig");
 const Lexer = @import("Lexer.zig");
 const Parser = @import("Parser.zig");
