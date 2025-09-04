@@ -11,7 +11,7 @@ pub fn @"error"(message: []const u8) Diagnostic {
 }
 
 pub const S = struct {
-    diagnostics: std.MultiArrayList(Diagnostic) = .{},
+    items: std.MultiArrayList(Diagnostic) = .{},
     allocator: std.mem.Allocator,
     config: std.io.tty.Config,
     /// Must be assigned if any diagnostics have spans.
@@ -24,41 +24,41 @@ pub const S = struct {
         };
     }
 
-    pub fn format(self: *Diagnostic.S, comptime fmt: []const u8, args: anytype) ![]const u8 {
-        return try std.fmt.allocPrint(self.allocator, fmt, args);
+    pub fn format(diagnostics: *Diagnostic.S, comptime fmt: []const u8, args: anytype) ![]const u8 {
+        return try std.fmt.allocPrint(diagnostics.allocator, fmt, args);
     }
 
-    pub fn emit(self: *Diagnostic.S, diagnostic: Diagnostic) !void {
-        try self.diagnostics.append(self.allocator, diagnostic);
+    pub fn emit(diagnostics: *Diagnostic.S, diagnostic: Diagnostic) !void {
+        try diagnostics.items.append(diagnostics.allocator, diagnostic);
     }
 
-    pub fn show(self: Diagnostic.S) !void {
+    pub fn show(diagnostics: Diagnostic.S) !void {
         const writer = std.io.getStdErr().writer();
-        const slice = self.diagnostics.slice();
+        const slice = diagnostics.items.slice();
         for (
             slice.items(.level),
             slice.items(.message),
             slice.items(.span),
         ) |level, message, maybe_span| {
-            try self.config.setColor(writer, .bold);
-            try self.config.setColor(writer, switch (level) {
+            try diagnostics.config.setColor(writer, .bold);
+            try diagnostics.config.setColor(writer, switch (level) {
                 .note => .green,
                 .@"error" => .red,
             });
             try writer.print("{s}", .{@tagName(level)});
-            try self.config.setColor(writer, .reset);
+            try diagnostics.config.setColor(writer, .reset);
             if (maybe_span) |span| {
-                const start = span.ptr - self.source_code_start;
+                const start = span.ptr - diagnostics.source_code_start;
                 try writer.print(" ({}..{})", .{ start, start + span.len });
             }
-            try self.config.setColor(writer, .bold);
+            try diagnostics.config.setColor(writer, .bold);
             try writer.print(": {s}\n", .{message});
         }
-        try self.config.setColor(writer, .reset);
+        try diagnostics.config.setColor(writer, .reset);
     }
 
-    pub fn isOk(self: Diagnostic.S) bool {
-        return std.mem.indexOfScalar(Level, self.diagnostics.items(.level), .@"error") == null;
+    pub fn isOk(diagnostics: Diagnostic.S) bool {
+        return std.mem.indexOfScalar(Level, diagnostics.items.items(.level), .@"error") == null;
     }
 };
 

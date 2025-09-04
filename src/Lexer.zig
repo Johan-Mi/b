@@ -4,74 +4,74 @@ pub fn init(source_code: []const u8) Lexer {
     return .{ .source_code = source_code };
 }
 
-pub fn next(self: *Lexer) ?Token {
-    const token = self.nextWithoutConsuming() orelse return null;
-    self.source_code = self.source_code[token.source.len..];
+pub fn next(lexer: *Lexer) ?Token {
+    const token = lexer.nextWithoutConsuming() orelse return null;
+    lexer.source_code = lexer.source_code[token.source.len..];
     return token;
 }
 
-fn nextWithoutConsuming(self: *Lexer) ?Token {
-    if (self.source_code.len == 0) return null;
-    if (self.skipTrivia()) |trivia| return trivia;
+fn nextWithoutConsuming(lexer: *Lexer) ?Token {
+    if (lexer.source_code.len == 0) return null;
+    if (lexer.skipTrivia()) |trivia| return trivia;
 
     inline for (symbols) |symbol| {
-        if (std.mem.startsWith(u8, self.source_code, symbol.text))
-            return self.makeToken(symbol.text.len, @enumFromInt(symbol.raw));
-    } else if (nonZero(std.mem.indexOfNone(u8, self.source_code, identifier_chars) orelse self.source_code.len)) |token_len| {
-        const text = self.source_code[0..token_len];
+        if (std.mem.startsWith(u8, lexer.source_code, symbol.text))
+            return lexer.makeToken(symbol.text.len, @enumFromInt(symbol.raw));
+    } else if (nonZero(std.mem.indexOfNone(u8, lexer.source_code, identifier_chars) orelse lexer.source_code.len)) |token_len| {
+        const text = lexer.source_code[0..token_len];
         const kind: SyntaxKind = keywords.get(text) orelse
-            if (std.ascii.isDigit(self.source_code[0])) .number else .identifier;
-        return self.makeToken(token_len, kind);
-    } else switch (self.source_code[0]) {
+            if (std.ascii.isDigit(lexer.source_code[0])) .number else .identifier;
+        return lexer.makeToken(token_len, kind);
+    } else switch (lexer.source_code[0]) {
         '"', '\'', '`' => {
-            const quote = self.source_code[0];
+            const quote = lexer.source_code[0];
             const kind: SyntaxKind = switch (quote) {
                 '"' => .string_literal,
                 '\'' => .character_literal,
                 '`' => .bcd_literal,
                 else => unreachable,
             };
-            const token_len = if (std.mem.indexOfScalarPos(u8, self.source_code, 1, quote)) |end|
+            const token_len = if (std.mem.indexOfScalarPos(u8, lexer.source_code, 1, quote)) |end|
                 end + 1
             else
-                self.source_code.len;
-            return self.makeToken(token_len, kind);
+                lexer.source_code.len;
+            return lexer.makeToken(token_len, kind);
         },
         else => {
-            const token_len = std.mem.indexOfAny(u8, self.source_code, all_valid_chars) orelse self.source_code.len;
-            return self.makeToken(token_len, .@"error");
+            const token_len = std.mem.indexOfAny(u8, lexer.source_code, all_valid_chars) orelse lexer.source_code.len;
+            return lexer.makeToken(token_len, .@"error");
         },
     }
 }
 
-fn skipTrivia(self: *Lexer) ?Token {
-    std.debug.assert(self.source_code.len != 0);
+fn skipTrivia(lexer: *Lexer) ?Token {
+    std.debug.assert(lexer.source_code.len != 0);
     var state: enum { normal, start_of_comment, comment, end_of_comment } = .normal;
-    return for (0.., self.source_code) |i, c| {
+    return for (0.., lexer.source_code) |i, c| {
         switch (state) {
             .normal => {
                 if (std.ascii.isWhitespace(c)) continue;
-                if (std.mem.startsWith(u8, self.source_code[i..], "/*")) {
+                if (std.mem.startsWith(u8, lexer.source_code[i..], "/*")) {
                     state = .start_of_comment;
                     continue;
                 }
-                break if (i == 0) null else self.makeToken(i, .trivia);
+                break if (i == 0) null else lexer.makeToken(i, .trivia);
             },
             // Skip the asterisk
             .start_of_comment => state = .comment,
             .comment => {
-                if (std.mem.startsWith(u8, self.source_code[i..], "*/"))
+                if (std.mem.startsWith(u8, lexer.source_code[i..], "*/"))
                     state = .end_of_comment;
             },
             // Skip the slash
             .end_of_comment => state = .normal,
         }
-    } else self.makeToken(self.source_code.len, .trivia);
+    } else lexer.makeToken(lexer.source_code.len, .trivia);
 }
 
-fn makeToken(self: Lexer, len: usize, kind: SyntaxKind) Token {
+fn makeToken(lexer: Lexer, len: usize, kind: SyntaxKind) Token {
     std.debug.assert(len != 0);
-    return .{ .kind = kind, .source = self.source_code[0..len] };
+    return .{ .kind = kind, .source = lexer.source_code[0..len] };
 }
 
 pub const Token = struct {

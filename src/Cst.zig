@@ -16,20 +16,20 @@ pub const Node = enum(usize) {
     root = 0,
     _,
 
-    pub fn source(self: Node, cst: Cst) []const u8 {
-        return cst.nodes.items(.source)[@intFromEnum(self)].?;
+    pub fn source(node: Node, cst: Cst) []const u8 {
+        return cst.nodes.items(.source)[@intFromEnum(node)].?;
     }
 
-    pub fn kind(self: Node, cst: Cst) SyntaxKind {
-        return cst.nodes.items(.kind)[@intFromEnum(self)];
+    pub fn kind(node: Node, cst: Cst) SyntaxKind {
+        return cst.nodes.items(.kind)[@intFromEnum(node)];
     }
 
-    pub fn parent(self: Node, cst: Cst) ?Node {
-        return cst.nodes.items(.parent)[@intFromEnum(self)];
+    pub fn parent(node: Node, cst: Cst) ?Node {
+        return cst.nodes.items(.parent)[@intFromEnum(node)];
     }
 
-    pub fn children(self: Node, cst: Cst) ChildIterator {
-        const range = cst.nodes.items(.children)[@intFromEnum(self)];
+    pub fn children(node: Node, cst: Cst) ChildIterator {
+        const range = cst.nodes.items(.children)[@intFromEnum(node)];
         std.debug.assert(range.start != .token);
         const start = @intFromEnum(range.start);
         return .{ .start = start, .end = start + range.count };
@@ -39,23 +39,23 @@ pub const Node = enum(usize) {
         start: usize,
         end: usize,
 
-        pub fn next(self: *ChildIterator, cst: Cst) ?Node {
-            if (self.start < self.end) {
-                defer self.start += 1;
-                return cst.children.items[self.start];
+        pub fn next(iter: *ChildIterator, cst: Cst) ?Node {
+            if (iter.start < iter.end) {
+                defer iter.start += 1;
+                return cst.children.items[iter.start];
             } else return null;
         }
     };
 };
 
-pub fn dump(self: Cst) void {
-    const nodes = self.nodes.slice();
+pub fn dump(cst: Cst) void {
+    const nodes = cst.nodes.slice();
     for (0.., nodes.items(.kind), nodes.items(.children)) |i, kind, children| {
         if (children.start == .token) {
             log.info("{}: {s}", .{ i, @tagName(kind) });
         } else {
             const child_slice =
-                self.children.items[@intFromEnum(children.start)..][0..children.count];
+                cst.children.items[@intFromEnum(children.start)..][0..children.count];
             log.info("{}: {s} {any}", .{ i, @tagName(kind), child_slice });
         }
     }
@@ -78,8 +78,8 @@ pub const Builder = struct {
         return .{ .arena = arena };
     }
 
-    pub fn finish(self: Builder, allocator: std.mem.Allocator) !Cst {
-        var threaded_tree: ?*ThreadedNode = try self.intoThreadedTree();
+    pub fn finish(builder: Builder, allocator: std.mem.Allocator) !Cst {
+        var threaded_tree: ?*ThreadedNode = try builder.intoThreadedTree();
 
         var cst: Cst = .{ .nodes = .{}, .children = .{} };
 
@@ -120,12 +120,12 @@ pub const Builder = struct {
         index: ?usize = null,
     };
 
-    fn intoThreadedTree(self: Builder) !*ThreadedNode {
+    fn intoThreadedTree(builder: Builder) !*ThreadedNode {
         var stack: std.ArrayListUnmanaged(*ThreadedNode) = .empty;
         var prev: ?*ThreadedNode = null;
-        var events = self.events;
+        var events = builder.events;
         std.debug.assert(events.pop().? == .close);
-        const arena = self.arena;
+        const arena = builder.arena;
         for (events.items) |event| {
             switch (event) {
                 .open => |kind| {
@@ -152,26 +152,26 @@ pub const Builder = struct {
         return stack.items[0];
     }
 
-    pub fn startNode(self: *Builder, kind: SyntaxKind) !void {
-        try self.events.append(self.arena, .{ .open = kind });
+    pub fn startNode(builder: *Builder, kind: SyntaxKind) !void {
+        try builder.events.append(builder.arena, .{ .open = kind });
     }
 
-    pub fn finishNode(self: *Builder) !void {
-        try self.events.append(self.arena, .close);
+    pub fn finishNode(builder: *Builder) !void {
+        try builder.events.append(builder.arena, .close);
     }
 
-    pub fn token(self: *Builder, kind: SyntaxKind, text: []const u8) !void {
-        try self.events.append(self.arena, .{ .token = .{ .source = text, .kind = kind } });
+    pub fn token(builder: *Builder, kind: SyntaxKind, text: []const u8) !void {
+        try builder.events.append(builder.arena, .{ .token = .{ .source = text, .kind = kind } });
     }
 
     pub const Checkpoint = enum(usize) { _ };
 
-    pub fn makeCheckpoint(self: Builder) Checkpoint {
-        return @enumFromInt(self.events.items.len);
+    pub fn makeCheckpoint(builder: Builder) Checkpoint {
+        return @enumFromInt(builder.events.items.len);
     }
 
-    pub fn startNodeAt(self: *Builder, checkpoint: Checkpoint, kind: SyntaxKind) !void {
-        try self.events.insert(self.arena, @intFromEnum(checkpoint), .{ .open = kind });
+    pub fn startNodeAt(builder: *Builder, checkpoint: Checkpoint, kind: SyntaxKind) !void {
+        try builder.events.insert(builder.arena, @intFromEnum(checkpoint), .{ .open = kind });
     }
 };
 
