@@ -22,7 +22,7 @@ pub const Statement = union(enum) {
 
     @"error",
 
-    pub const nop: @This() = .{ .compound = &.{} };
+    pub const nop: Statement = .{ .compound = &.{} };
 };
 
 pub const Expression = union(enum) {

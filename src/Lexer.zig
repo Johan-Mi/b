@@ -1,16 +1,16 @@
 source_code: []const u8,
 
-pub fn init(source_code: []const u8) @This() {
+pub fn init(source_code: []const u8) Lexer {
     return .{ .source_code = source_code };
 }
 
-pub fn next(self: *@This()) ?Token {
+pub fn next(self: *Lexer) ?Token {
     const token = self.nextWithoutConsuming() orelse return null;
     self.source_code = self.source_code[token.source.len..];
     return token;
 }
 
-fn nextWithoutConsuming(self: *@This()) ?Token {
+fn nextWithoutConsuming(self: *Lexer) ?Token {
     if (self.source_code.len == 0) return null;
     if (self.skipTrivia()) |trivia| return trivia;
 
@@ -44,7 +44,7 @@ fn nextWithoutConsuming(self: *@This()) ?Token {
     }
 }
 
-fn skipTrivia(self: *@This()) ?Token {
+fn skipTrivia(self: *Lexer) ?Token {
     std.debug.assert(self.source_code.len != 0);
     var state: enum { normal, start_of_comment, comment, end_of_comment } = .normal;
     return for (0.., self.source_code) |i, c| {
@@ -69,7 +69,7 @@ fn skipTrivia(self: *@This()) ?Token {
     } else self.makeToken(self.source_code.len, .trivia);
 }
 
-fn makeToken(self: @This(), len: usize, kind: SyntaxKind) Token {
+fn makeToken(self: Lexer, len: usize, kind: SyntaxKind) Token {
     std.debug.assert(len != 0);
     return .{ .kind = kind, .source = self.source_code[0..len] };
 }
@@ -130,6 +130,8 @@ fn fuzzLexer(_: void, input: []const u8) !void {
     }
     try std.testing.expectEqualStrings("", input_bytes);
 }
+
+const Lexer = @This();
 
 const std = @import("std");
 const SyntaxKind = @import("syntax.zig").Kind;

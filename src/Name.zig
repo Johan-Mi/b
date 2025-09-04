@@ -1,6 +1,6 @@
 node: Cst.Node,
 
-pub fn resolve(token: Cst.Node, cst: Cst) ?@This() {
+pub fn resolve(token: Cst.Node, cst: Cst) ?Name {
     std.debug.assert(token.kind(cst) == .identifier);
     const name = token.source(cst);
     var maybe_node = token.parent(cst);
@@ -28,6 +28,8 @@ pub fn resolve(token: Cst.Node, cst: Cst) ?@This() {
         }
     } else null;
 }
+
+const Name = @This();
 
 const ast = @import("ast.zig");
 const Cst = @import("Cst.zig");

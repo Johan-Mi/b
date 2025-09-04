@@ -16,19 +16,19 @@ pub const Node = enum(usize) {
     root = 0,
     _,
 
-    pub fn source(self: @This(), cst: Cst) []const u8 {
+    pub fn source(self: Node, cst: Cst) []const u8 {
         return cst.nodes.items(.source)[@intFromEnum(self)].?;
     }
 
-    pub fn kind(self: @This(), cst: Cst) SyntaxKind {
+    pub fn kind(self: Node, cst: Cst) SyntaxKind {
         return cst.nodes.items(.kind)[@intFromEnum(self)];
     }
 
-    pub fn parent(self: @This(), cst: Cst) ?@This() {
+    pub fn parent(self: Node, cst: Cst) ?Node {
         return cst.nodes.items(.parent)[@intFromEnum(self)];
     }
 
-    pub fn children(self: @This(), cst: Cst) ChildIterator {
+    pub fn children(self: Node, cst: Cst) ChildIterator {
         const range = cst.nodes.items(.children)[@intFromEnum(self)];
         std.debug.assert(range.start != .token);
         const start = @intFromEnum(range.start);
@@ -39,7 +39,7 @@ pub const Node = enum(usize) {
         start: usize,
         end: usize,
 
-        pub fn next(self: *@This(), cst: Cst) ?Node {
+        pub fn next(self: *ChildIterator, cst: Cst) ?Node {
             if (self.start < self.end) {
                 defer self.start += 1;
                 return cst.children.items[self.start];
@@ -48,7 +48,7 @@ pub const Node = enum(usize) {
     };
 };
 
-pub fn dump(self: @This()) void {
+pub fn dump(self: Cst) void {
     const nodes = self.nodes.slice();
     for (0.., nodes.items(.kind), nodes.items(.children)) |i, kind, children| {
         if (children.start == .token) {
@@ -74,11 +74,11 @@ pub const Builder = struct {
         close,
     };
 
-    pub fn init(arena: std.mem.Allocator) @This() {
+    pub fn init(arena: std.mem.Allocator) Builder {
         return .{ .arena = arena };
     }
 
-    pub fn finish(self: @This(), allocator: std.mem.Allocator) !Cst {
+    pub fn finish(self: Builder, allocator: std.mem.Allocator) !Cst {
         var threaded_tree: ?*ThreadedNode = try self.intoThreadedTree();
 
         var cst: Cst = .{ .nodes = .{}, .children = .{} };
@@ -115,12 +115,12 @@ pub const Builder = struct {
         kind: SyntaxKind,
         parent: ?Node = null,
         /// Null iff this is a token.
-        children: ?std.ArrayListUnmanaged(*@This()),
-        next: ?*@This() = null,
+        children: ?std.ArrayListUnmanaged(*ThreadedNode),
+        next: ?*ThreadedNode = null,
         index: ?usize = null,
     };
 
-    fn intoThreadedTree(self: @This()) !*ThreadedNode {
+    fn intoThreadedTree(self: Builder) !*ThreadedNode {
         var stack: std.ArrayListUnmanaged(*ThreadedNode) = .empty;
         var prev: ?*ThreadedNode = null;
         var events = self.events;
@@ -152,30 +152,31 @@ pub const Builder = struct {
         return stack.items[0];
     }
 
-    pub fn startNode(self: *@This(), kind: SyntaxKind) !void {
+    pub fn startNode(self: *Builder, kind: SyntaxKind) !void {
         try self.events.append(self.arena, .{ .open = kind });
     }
 
-    pub fn finishNode(self: *@This()) !void {
+    pub fn finishNode(self: *Builder) !void {
         try self.events.append(self.arena, .close);
     }
 
-    pub fn token(self: *@This(), kind: SyntaxKind, text: []const u8) !void {
+    pub fn token(self: *Builder, kind: SyntaxKind, text: []const u8) !void {
         try self.events.append(self.arena, .{ .token = .{ .source = text, .kind = kind } });
     }
 
     pub const Checkpoint = enum(usize) { _ };
 
-    pub fn makeCheckpoint(self: @This()) Checkpoint {
+    pub fn makeCheckpoint(self: Builder) Checkpoint {
         return @enumFromInt(self.events.items.len);
     }
 
-    pub fn startNodeAt(self: *@This(), checkpoint: Checkpoint, kind: SyntaxKind) !void {
+    pub fn startNodeAt(self: *Builder, checkpoint: Checkpoint, kind: SyntaxKind) !void {
         try self.events.insert(self.arena, @intFromEnum(checkpoint), .{ .open = kind });
     }
 };
 
 const Cst = @This();
+
 const std = @import("std");
 const SyntaxKind = @import("syntax.zig").Kind;
 const log = std.log.scoped(.cst);

@@ -6,7 +6,7 @@ pub fn parse(
     tokens: std.MultiArrayList(Token).Slice,
     arena: std.mem.Allocator,
 ) !Cst {
-    var self: @This() = .{ .tokens = tokens, .cst = .init(arena) };
+    var self: Parser = .{ .tokens = tokens, .cst = .init(arena) };
     try self.cst.startNode(.document);
     while (!self.at(.eof))
         try self.parseTopLevelItem();
@@ -14,7 +14,7 @@ pub fn parse(
     return self.cst.finish(arena);
 }
 
-fn parseTopLevelItem(self: *@This()) !void {
+fn parseTopLevelItem(self: *Parser) !void {
     if (!self.at(.identifier))
         try self.@"error"()
     else switch (self.peekNth(1)) {
@@ -24,7 +24,7 @@ fn parseTopLevelItem(self: *@This()) !void {
     }
 }
 
-fn parseGlobalDeclaration(self: *@This()) !void {
+fn parseGlobalDeclaration(self: *Parser) !void {
     std.debug.assert(self.at(.identifier));
     try self.startNode(.global_declaration);
 
@@ -64,7 +64,7 @@ fn parseGlobalDeclaration(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseFunction(self: *@This()) !void {
+fn parseFunction(self: *Parser) !void {
     std.debug.assert(self.at(.identifier));
     try self.startNode(.function);
 
@@ -75,7 +75,7 @@ fn parseFunction(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseFunctionParameters(self: *@This()) !void {
+fn parseFunctionParameters(self: *Parser) !void {
     std.debug.assert(self.at(.@"("));
     try self.startNode(.function_parameters);
 
@@ -86,7 +86,7 @@ fn parseFunctionParameters(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseStatement(self: *@This()) error{OutOfMemory}!void {
+fn parseStatement(self: *Parser) error{OutOfMemory}!void {
     switch (self.peek()) {
         .@";" => try self.parseNullStatement(),
         .@"{" => try self.parseCompoundStatement(),
@@ -98,7 +98,7 @@ fn parseStatement(self: *@This()) error{OutOfMemory}!void {
     }
 }
 
-fn parseNullStatement(self: *@This()) !void {
+fn parseNullStatement(self: *Parser) !void {
     std.debug.assert(self.at(.@";"));
     try self.startNode(.null_statement);
 
@@ -107,7 +107,7 @@ fn parseNullStatement(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseCompoundStatement(self: *@This()) !void {
+fn parseCompoundStatement(self: *Parser) !void {
     std.debug.assert(self.at(.@"{"));
     try self.startNode(.compound_statement);
 
@@ -118,7 +118,7 @@ fn parseCompoundStatement(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseAuto(self: *@This()) !void {
+fn parseAuto(self: *Parser) !void {
     std.debug.assert(self.at(.kw_auto));
     try self.startNode(.auto);
 
@@ -137,7 +137,7 @@ fn parseAuto(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseExtrn(self: *@This()) !void {
+fn parseExtrn(self: *Parser) !void {
     std.debug.assert(self.at(.kw_extrn));
     try self.startNode(.extrn);
 
@@ -156,7 +156,7 @@ fn parseExtrn(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseIf(self: *@This()) !void {
+fn parseIf(self: *Parser) !void {
     std.debug.assert(self.at(.kw_if));
     try self.startNode(.@"if");
 
@@ -169,7 +169,7 @@ fn parseIf(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseWhile(self: *@This()) !void {
+fn parseWhile(self: *Parser) !void {
     std.debug.assert(self.at(.kw_while));
     try self.startNode(.@"while");
 
@@ -182,7 +182,7 @@ fn parseWhile(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseExpressionStatement(self: *@This()) !void {
+fn parseExpressionStatement(self: *Parser) !void {
     try self.startNode(.expression_statement);
 
     try self.parseExpression();
@@ -191,11 +191,11 @@ fn parseExpressionStatement(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseExpression(self: *@This()) error{OutOfMemory}!void {
+fn parseExpression(self: *Parser) error{OutOfMemory}!void {
     try self.parseExpressionRecursively(0);
 }
 
-fn parseAtom(self: *@This()) !void {
+fn parseAtom(self: *Parser) !void {
     switch (self.peek()) {
         .identifier => if (self.peekNth(1) == .@"(")
             try self.parseFunctionCall()
@@ -209,7 +209,7 @@ fn parseAtom(self: *@This()) !void {
     }
 }
 
-fn parseVariable(self: *@This()) !void {
+fn parseVariable(self: *Parser) !void {
     std.debug.assert(self.at(.identifier));
     try self.startNode(.variable);
 
@@ -218,7 +218,7 @@ fn parseVariable(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseParenthesizedExpression(self: *@This()) !void {
+fn parseParenthesizedExpression(self: *Parser) !void {
     std.debug.assert(self.at(.@"("));
     try self.startNode(.parenthesized_expression);
 
@@ -229,7 +229,7 @@ fn parseParenthesizedExpression(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseFunctionCall(self: *@This()) !void {
+fn parseFunctionCall(self: *Parser) !void {
     std.debug.assert(self.at(.identifier));
     try self.startNode(.function_call);
 
@@ -250,7 +250,7 @@ fn parseFunctionCall(self: *@This()) !void {
     try self.cst.finishNode();
 }
 
-fn parseExpressionRecursively(self: *@This(), bp_min: BindingPower) !void {
+fn parseExpressionRecursively(self: *Parser, bp_min: BindingPower) !void {
     const checkpoint = try self.makeCheckpoint();
 
     if (prefixBindingPower(self.peek())) |bp_right| {
@@ -363,13 +363,13 @@ pub fn infixBindingPower(kind: SyntaxKind) ?struct { left: BindingPower, right: 
     };
 }
 
-fn @"error"(self: *@This()) !void {
+fn @"error"(self: *Parser) !void {
     try self.startNode(.@"error");
     try self.parseAnything();
     try self.cst.finishNode();
 }
 
-fn parseAnything(self: *@This()) !void {
+fn parseAnything(self: *Parser) !void {
     switch (self.peek()) {
         .@"(" => {
             try self.bump();
@@ -395,7 +395,7 @@ fn parseAnything(self: *@This()) !void {
     }
 }
 
-fn bump(self: *@This()) !void {
+fn bump(self: *Parser) !void {
     while (!self.at(.eof)) {
         const token = self.tokens.get(self.index);
         try self.cst.token(token.kind, token.source);
@@ -404,17 +404,17 @@ fn bump(self: *@This()) !void {
     }
 }
 
-fn startNode(self: *@This(), kind: SyntaxKind) !void {
+fn startNode(self: *Parser, kind: SyntaxKind) !void {
     try self.skipTrivia();
     try self.cst.startNode(kind);
 }
 
-fn makeCheckpoint(self: *@This()) !Cst.Builder.Checkpoint {
+fn makeCheckpoint(self: *Parser) !Cst.Builder.Checkpoint {
     try self.skipTrivia();
     return self.cst.makeCheckpoint();
 }
 
-fn skipTrivia(self: *@This()) !void {
+fn skipTrivia(self: *Parser) !void {
     while (self.index < self.tokens.len) : (self.index += 1) {
         const token = self.tokens.get(self.index);
         if (token.kind != .trivia) break;
@@ -422,24 +422,24 @@ fn skipTrivia(self: *@This()) !void {
     }
 }
 
-fn eat(self: *@This(), kind: SyntaxKind) !bool {
+fn eat(self: *Parser, kind: SyntaxKind) !bool {
     if (self.at(kind)) {
         try self.bump();
         return true;
     } else return false;
 }
 
-fn at(self: *@This(), kind: SyntaxKind) bool {
+fn at(self: *Parser, kind: SyntaxKind) bool {
     return self.peek() == kind;
 }
 
-fn peek(self: @This()) SyntaxKind {
+fn peek(self: Parser) SyntaxKind {
     const kinds = self.tokens.items(.kind);
     const index = std.mem.indexOfNonePos(SyntaxKind, kinds, self.index, &.{.trivia}) orelse return .eof;
     return kinds[index];
 }
 
-fn peekNth(self: @This(), n: usize) SyntaxKind {
+fn peekNth(self: Parser, n: usize) SyntaxKind {
     var i: usize = 0;
     return for (self.tokens.items(.kind)[self.index..]) |kind| {
         if (kind == .trivia) continue;
@@ -467,6 +467,8 @@ fn fuzzParser(_: void, input_bytes: []const u8) !void {
     const cst = try parse(tokens.slice(), arena.allocator(), std.testing.allocator);
     defer cst.deinit(std.testing.allocator);
 }
+
+const Parser = @This();
 
 const Cst = @import("Cst.zig");
 const std = @import("std");
