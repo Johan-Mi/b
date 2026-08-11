@@ -452,9 +452,11 @@ test "fuzz parser" {
     try std.testing.fuzz({}, fuzzParser, .{});
 }
 
-fn fuzzParser(_: void, input_bytes: []const u8) !void {
+fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
+    var buffer: [1024]u8 = undefined;
+    const input_bytes = buffer[0..smith.slice(&buffer)];
     var lexer: @import("Lexer.zig") = .init(input_bytes);
-    var tokens: std.MultiArrayList(Token) = .{};
+    var tokens: std.MultiArrayList(Token) = .empty;
     defer tokens.deinit(std.testing.allocator);
 
     while (lexer.next()) |token| {
@@ -464,8 +466,7 @@ fn fuzzParser(_: void, input_bytes: []const u8) !void {
     var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena.deinit();
 
-    const cst = try parse(tokens.slice(), arena.allocator(), std.testing.allocator);
-    defer cst.deinit(std.testing.allocator);
+    _ = try parse(tokens.slice(), arena.allocator());
 }
 
 const Parser = @This();

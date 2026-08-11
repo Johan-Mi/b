@@ -1,7 +1,8 @@
 pub fn compile(
     program: ir.Program,
-    output_file: std.fs.File,
+    output_file: std.Io.File,
     arena: std.mem.Allocator,
+    io: std.Io,
 ) !void {
     var builder: llvm.Builder = try .init(.{ .allocator = arena });
 
@@ -11,7 +12,7 @@ pub fn compile(
         .name = "b",
         .version = .{ .major = 0, .minor = 0, .patch = 0 },
     });
-    try output_file.writeAll(std.mem.sliceAsBytes(bitcode));
+    try output_file.writeStreamingAll(io, std.mem.sliceAsBytes(bitcode));
 }
 
 fn compileFunction(

@@ -81,7 +81,7 @@ pub const Builder = struct {
     pub fn finish(builder: Builder, allocator: std.mem.Allocator) !Cst {
         var threaded_tree: ?*ThreadedNode = try builder.intoThreadedTree();
 
-        var cst: Cst = .{ .nodes = .{}, .children = .{} };
+        var cst: Cst = .{ .nodes = .empty, .children = .empty };
 
         while (threaded_tree) |threaded_node| : (threaded_tree = threaded_node.next) {
             if (threaded_node.index) |index|

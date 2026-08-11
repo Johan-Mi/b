@@ -1,31 +1,31 @@
-pub fn main() !u8 {
-    var arena: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
-    const allocator = arena.allocator();
+pub fn main(init: std.process.Init) !u8 {
+    const allocator = init.arena.allocator();
 
-    var diagnostics: Diagnostic.S = .init(allocator);
+    var diagnostics: Diagnostic.S = try .init(allocator, init.io, init.minimal.environ);
 
-    realMain(allocator, &diagnostics) catch |err| try diagnostics.emit(.@"error"(@errorName(err)));
+    realMain(init, &diagnostics) catch |err|
+        try diagnostics.emit(.@"error"(@errorName(err)));
 
-    try diagnostics.show();
+    try diagnostics.show(init.io);
     return @intFromBool(!diagnostics.isOk());
 }
 
-fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
+fn realMain(init: std.process.Init, diagnostics: *Diagnostic.S) !void {
     const source_code = blk: {
-        const args = try std.process.argsAlloc(allocator);
-        defer std.process.argsFree(allocator, args);
-
-        const me = if (1 <= args.len) args[0] else "b";
-        if (args.len != 2) {
-            try diagnostics.emit(.@"error"(
-                if (args.len < 2) "no source file provided" else "too many command line arguments",
-            ));
+        var iter = init.minimal.args.iterate();
+        const me = iter.next() orelse "b";
+        const source_path = iter.next() orelse {
+            try diagnostics.emit(.@"error"("no source file provided"));
+            const usage = try diagnostics.format("usage: {s} SOURCE.b", .{me});
+            return try diagnostics.emit(.note(usage));
+        };
+        if (iter.next()) |_| {
+            try diagnostics.emit(.@"error"("too many command line arguments"));
             const usage = try diagnostics.format("usage: {s} SOURCE.b", .{me});
             return try diagnostics.emit(.note(usage));
         }
-        const source_path = args[1];
 
-        break :blk std.fs.cwd().readFileAlloc(allocator, source_path, std.math.maxInt(usize)) catch |err| {
+        break :blk std.Io.Dir.cwd().readFileAlloc(init.io, source_path, init.arena.allocator(), .unlimited) catch |err| {
             try diagnostics.emit(.@"error"("failed to read source code"));
             try diagnostics.emit(.note(@errorName(err)));
             return;
@@ -35,9 +35,9 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
     diagnostics.source_code_start = source_code.ptr;
 
     var lexer: Lexer = .init(source_code);
-    var tokens: std.MultiArrayList(Lexer.Token) = .{};
+    var tokens: std.MultiArrayList(Lexer.Token) = .empty;
     while (lexer.next()) |token| {
-        try tokens.append(allocator, token);
+        try tokens.append(init.arena.allocator(), token);
         switch (token.kind) {
             .@"error" => try diagnostics.emit(.{
                 .level = .@"error",
@@ -63,18 +63,18 @@ fn realMain(allocator: std.mem.Allocator, diagnostics: *Diagnostic.S) !void {
         }
     }
 
-    const cst = try Parser.parse(tokens.slice(), allocator);
+    const cst = try Parser.parse(tokens.slice(), init.arena.allocator());
 
-    if (std.process.hasEnvVarConstant("DUMP_CST")) cst.dump();
+    if (init.minimal.environ.containsConstant("DUMP_CST")) cst.dump();
 
-    const program = try @import("ir/lowering.zig").lower(cst, allocator, diagnostics);
+    const program = try @import("ir/lowering.zig").lower(cst, init.arena.allocator(), diagnostics);
 
-    if (std.process.hasEnvVarConstant("DUMP_IR")) {
+    if (init.minimal.environ.containsConstant("DUMP_IR")) {
         std.log.info("{}", .{std.json.fmt(program, .{})});
     }
 
-    const output_file = try std.fs.cwd().createFile("main.bc", .{});
-    try @import("codegen.zig").compile(program, output_file, allocator);
+    const output_file = try std.Io.Dir.cwd().createFile(init.io, "main.bc", .{});
+    try @import("codegen.zig").compile(program, output_file, init.arena.allocator(), init.io);
 }
 
 test {

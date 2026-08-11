@@ -21,7 +21,7 @@ fn lowerFunction(
     arena: std.mem.Allocator,
     diagnostics: *Diagnostics,
 ) !ir.Function {
-    const name = try arena.dupeZ(u8, function.name(cst).?.source(cst));
+    const name = try arena.dupeSentinel(u8, function.name(cst).?.source(cst), 0);
     const body = if (function.body(cst)) |body|
         try lowerStatement(body, arena, cst, diagnostics)
     else blk: {

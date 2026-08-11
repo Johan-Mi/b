@@ -16,7 +16,7 @@ fn nextWithoutConsuming(lexer: *Lexer) ?Token {
 
     inline for (symbols) |symbol| {
         if (std.mem.startsWith(u8, lexer.source_code, symbol.text))
-            return lexer.makeToken(symbol.text.len, @enumFromInt(symbol.raw));
+            return lexer.makeToken(symbol.text.len, @fromBackingInt(@intCast(symbol.raw)));
     } else if (nonZero(std.mem.indexOfNone(u8, lexer.source_code, identifier_chars) orelse lexer.source_code.len)) |token_len| {
         const text = lexer.source_code[0..token_len];
         const kind: SyntaxKind = keywords.get(text) orelse
@@ -84,12 +84,12 @@ const all_valid_chars = identifier_chars ++ "!\"#%&'()*+,-/:;<=>?@[]^`{|}";
 
 const keywords: std.StaticStringMap(SyntaxKind) = blk: {
     const prefix = "kw_";
-    const syntax_kinds = @typeInfo(SyntaxKind).@"enum".fields;
+    const syntax_kinds = @typeInfo(SyntaxKind).@"enum".field_names;
     var array: [syntax_kinds.len]struct { []const u8, SyntaxKind } = undefined;
     var len = 0;
     for (syntax_kinds, 0..) |kind, i| {
-        if (std.mem.startsWith(u8, kind.name, prefix)) {
-            array[len] = .{ kind.name[prefix.len..], @enumFromInt(i) };
+        if (std.mem.cutPrefix(u8, kind, prefix)) |keyword| {
+            array[len] = .{ keyword, @fromBackingInt(@intCast(i)) };
             len += 1;
         }
     }
@@ -99,12 +99,12 @@ const keywords: std.StaticStringMap(SyntaxKind) = blk: {
 const symbols = blk: {
     @setEvalBranchQuota(7000);
 
-    const syntax_kinds = @typeInfo(SyntaxKind).@"enum".fields;
+    const syntax_kinds = @typeInfo(SyntaxKind).@"enum".field_names;
     var array: [syntax_kinds.len]struct { text: []const u8, raw: comptime_int } = undefined;
     var len = 0;
     for (syntax_kinds, 0..) |kind, i| {
-        if (std.mem.indexOfAny(u8, kind.name, identifier_chars) == null) {
-            array[len] = .{ .text = kind.name, .raw = i };
+        if (std.mem.indexOfAny(u8, kind, identifier_chars) == null) {
+            array[len] = .{ .text = kind, .raw = i };
             len += 1;
         }
     }
@@ -119,8 +119,9 @@ test "fuzz lexer" {
     try std.testing.fuzz({}, fuzzLexer, .{});
 }
 
-fn fuzzLexer(_: void, input: []const u8) !void {
-    var input_bytes = input;
+fn fuzzLexer(_: void, smith: *std.testing.Smith) !void {
+    var buffer: [1024]u8 = undefined;
+    var input_bytes = buffer[0..smith.slice(&buffer)];
     var lexer = init(input_bytes);
 
     // Token stream must match input.
