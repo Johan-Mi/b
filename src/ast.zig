@@ -163,8 +163,8 @@ fn CastUnionEnumImpl(Self: type) type {
     return struct {
         fn cast(syntax: Cst.Node) ?Self {
             const type_info = @typeInfo(Self).@"union";
-            return inline for (type_info.field_names, type_info.field_types) |name, ty| {
-                if (ty.cast(syntax)) |it| break @unionInit(Self, name, it);
+            return inline for (type_info.fields) |field| {
+                if (field.type.cast(syntax)) |it| break @unionInit(Self, field.name, it);
             } else null;
         }
     };

@@ -17,22 +17,22 @@ pub const Node = struct {
     cst: Cst,
 
     pub fn source(node: Node) []const u8 {
-        return node.cst.nodes.items(.source)[@backingInt(node.index)].?;
+        return node.cst.nodes.items(.source)[@intFromEnum(node.index)].?;
     }
 
     pub fn kind(node: Node) SyntaxKind {
-        return node.cst.nodes.items(.kind)[@backingInt(node.index)];
+        return node.cst.nodes.items(.kind)[@intFromEnum(node.index)];
     }
 
     pub fn parent(node: Node) ?Node {
-        const index = node.cst.nodes.items(.parent)[@backingInt(node.index)] orelse return null;
+        const index = node.cst.nodes.items(.parent)[@intFromEnum(node.index)] orelse return null;
         return .{ .index = index, .cst = node.cst };
     }
 
     pub fn children(node: Node) ChildIterator {
-        const range = node.cst.nodes.items(.children)[@backingInt(node.index)];
+        const range = node.cst.nodes.items(.children)[@intFromEnum(node.index)];
         std.debug.assert(range.start != .token);
-        const start = @backingInt(range.start);
+        const start = @intFromEnum(range.start);
         return .{ .start = start, .end = start + range.count, .cst = node.cst };
     }
 
@@ -59,7 +59,7 @@ pub fn dump(cst: Cst) void {
             log.info("{}: {s}", .{ i, @tagName(kind) });
         } else {
             const child_slice =
-                cst.children.items[@backingInt(children.start)..][0..children.count];
+                cst.children.items[@intFromEnum(children.start)..][0..children.count];
             log.info("{}: {s} {any}", .{ i, @tagName(kind), child_slice });
         }
     }
@@ -89,9 +89,9 @@ pub const Builder = struct {
 
         while (threaded_tree) |threaded_node| : (threaded_tree = threaded_node.next) {
             if (threaded_node.index) |index|
-                cst.children.items[index] = @fromBackingInt(@intCast(cst.nodes.len));
+                cst.children.items[index] = @enumFromInt(cst.nodes.len);
             const start: Start = if (threaded_node.children) |_|
-                @fromBackingInt(@intCast(cst.children.items.len))
+                @enumFromInt(cst.children.items.len)
             else
                 .token;
             const count = if (threaded_node.children) |c| c.items.len else 0;
@@ -104,8 +104,8 @@ pub const Builder = struct {
             });
             _ = try cst.children.addManyAsSlice(allocator, count);
             if (threaded_node.children) |c| {
-                for (c.items, @backingInt(start)..) |child, index| {
-                    child.parent = @fromBackingInt(@intCast(me));
+                for (c.items, @intFromEnum(start)..) |child, index| {
+                    child.parent = @enumFromInt(me);
                     child.index = index;
                 }
             }
@@ -171,11 +171,11 @@ pub const Builder = struct {
     pub const Checkpoint = enum(usize) { _ };
 
     pub fn makeCheckpoint(builder: Builder) Checkpoint {
-        return @fromBackingInt(@intCast(builder.events.items.len));
+        return @enumFromInt(builder.events.items.len);
     }
 
     pub fn startNodeAt(builder: *Builder, checkpoint: Checkpoint, kind: SyntaxKind) !void {
-        try builder.events.insert(builder.arena, @backingInt(checkpoint), .{ .open = kind });
+        try builder.events.insert(builder.arena, @intFromEnum(checkpoint), .{ .open = kind });
     }
 };
 
