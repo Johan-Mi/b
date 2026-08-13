@@ -3,13 +3,13 @@ pub fn lower(
     arena: std.mem.Allocator,
     diagnostics: *Diagnostics,
 ) !ir.Program {
-    const document = ast.Document.cast(.root, cst).?;
+    const document = ast.Document.cast(.{ .index = .root, .cst = cst }).?;
 
-    var iterator = document.functions(cst);
-    const functions = try arena.alloc(ir.Function, iterator.count(cst));
+    var iterator = document.functions();
+    const functions = try arena.alloc(ir.Function, iterator.count());
     var i: usize = 0;
-    while (iterator.next(cst)) |function| : (i += 1) {
-        functions[i] = try lowerFunction(function, cst, arena, diagnostics);
+    while (iterator.next()) |function| : (i += 1) {
+        functions[i] = try lowerFunction(function, arena, diagnostics);
     }
 
     return .{ .functions = functions };
@@ -17,18 +17,17 @@ pub fn lower(
 
 fn lowerFunction(
     function: ast.Function,
-    cst: Cst,
     arena: std.mem.Allocator,
     diagnostics: *Diagnostics,
 ) !ir.Function {
-    const name = try arena.dupeSentinel(u8, function.name(cst).?.source(cst), 0);
-    const body = if (function.body(cst)) |body|
-        try lowerStatement(body, arena, cst, diagnostics)
+    const name = try arena.dupeSentinel(u8, function.name().?.source(), 0);
+    const body = if (function.body()) |body|
+        try lowerStatement(body, arena, diagnostics)
     else blk: {
         try diagnostics.emit(.{
             .level = .@"error",
             .message = "function has no body",
-            .span = function.syntax.source(cst),
+            .span = function.syntax.source(),
         });
         break :blk .@"error";
     };
@@ -42,117 +41,109 @@ fn lowerFunction(
 fn lowerStatement(
     statement: ast.Statement,
     arena: std.mem.Allocator,
-    cst: Cst,
     diagnostics: *Diagnostics,
 ) error{OutOfMemory}!ir.Statement {
     return switch (statement) {
         .auto, .extrn => .nop,
         .compound => |it| blk: {
-            var iterator = it.statements(cst);
-            const statements = try arena.alloc(ir.Statement, iterator.count(cst));
+            var iterator = it.statements();
+            const statements = try arena.alloc(ir.Statement, iterator.count());
             var i: usize = 0;
-            while (iterator.next(cst)) |s| : (i += 1) {
-                statements[i] = try lowerStatement(s, arena, cst, diagnostics);
+            while (iterator.next()) |s| : (i += 1) {
+                statements[i] = try lowerStatement(s, arena, diagnostics);
             }
             break :blk .{ .compound = statements };
         },
         .@"if" => |it| .{ .@"if" = .{
-            .condition = try lowerExpressionOpt(it.condition(cst), cst, arena, diagnostics),
-            .body = try box(arena, try lowerStatementOpt(it.body(cst), cst, arena, diagnostics)),
+            .condition = try lowerExpressionOpt(it.condition(), arena, diagnostics),
+            .body = try box(arena, try lowerStatementOpt(it.body(), arena, diagnostics)),
         } },
         .@"while" => |it| .{ .@"while" = .{
-            .condition = try lowerExpressionOpt(it.condition(cst), cst, arena, diagnostics),
-            .body = try box(arena, try lowerStatementOpt(it.body(cst), cst, arena, diagnostics)),
+            .condition = try lowerExpressionOpt(it.condition(), arena, diagnostics),
+            .body = try box(arena, try lowerStatementOpt(it.body(), arena, diagnostics)),
         } },
         .expression => |it| .{
-            .expression = try lowerExpressionOpt(it.expression(cst), cst, arena, diagnostics),
+            .expression = try lowerExpressionOpt(it.expression(), arena, diagnostics),
         },
     };
 }
 
 fn lowerStatementOpt(
     statement: ?ast.Statement,
-    cst: Cst,
     arena: std.mem.Allocator,
     diagnostics: *Diagnostics,
 ) !ir.Statement {
-    return if (statement) |it| lowerStatement(it, arena, cst, diagnostics) else .@"error";
+    return if (statement) |it| lowerStatement(it, arena, diagnostics) else .@"error";
 }
 
 fn lowerExpression(
     expression: ast.Expression,
-    cst: Cst,
     arena: std.mem.Allocator,
     diagnostics: *Diagnostics,
 ) error{OutOfMemory}!ir.Expression {
     return switch (expression) {
         .prefix => |it| .{ .prefix = .{
-            .operator = it.operator(cst).?.kind(cst),
+            .operator = it.operator().?.kind(),
             .operand = try box(arena, try lowerExpressionOpt(
-                it.operand(cst),
-                cst,
+                it.operand(),
                 arena,
                 diagnostics,
             )),
         } },
         .infix => |it| .{ .infix = .{
             .lhs = try box(arena, try lowerExpressionOpt(
-                it.lhs(cst),
-                cst,
+                it.lhs(),
                 arena,
                 diagnostics,
             )),
-            .operator = it.operator(cst).?.kind(cst),
+            .operator = it.operator().?.kind(),
             .rhs = try box(arena, try lowerExpressionOpt(
-                it.rhs(cst).?.expression(cst),
-                cst,
+                it.rhs().?.expression(),
                 arena,
                 diagnostics,
             )),
         } },
         .postfix => |it| .{ .postfix = .{
-            .operator = it.operator(cst).?.kind(cst),
+            .operator = it.operator().?.kind(),
             .operand = try box(arena, try lowerExpressionOpt(
-                it.operand(cst),
-                cst,
+                it.operand(),
                 arena,
                 diagnostics,
             )),
         } },
-        .number => |it| if (std.fmt.parseInt(i64, it.syntax.source(cst), 10)) |n|
+        .number => |it| if (std.fmt.parseInt(i64, it.syntax.source(), 10)) |n|
             .{ .number = n }
         else |_| blk: {
             try diagnostics.emit(.{
                 .level = .@"error",
                 .message = "integer literal is out of range",
-                .span = it.syntax.source(cst),
+                .span = it.syntax.source(),
             });
             break :blk .@"error";
         },
         .variable => |it| blk: {
-            const token = it.identifier(cst).?;
-            if (Name.resolve(token, cst)) |name| {
+            const token = it.identifier().?;
+            if (Name.resolve(token)) |name| {
                 break :blk .{ .variable = name };
             } else {
                 try diagnostics.emit(.{
                     .level = .@"error",
                     .message = "undeclared identifier",
-                    .span = token.source(cst),
+                    .span = token.source(),
                 });
                 break :blk .@"error";
             }
         },
-        .parenthesized => |it| lowerExpressionOpt(it.inner(cst), cst, arena, diagnostics),
+        .parenthesized => |it| lowerExpressionOpt(it.inner(), arena, diagnostics),
     };
 }
 
 fn lowerExpressionOpt(
     expression: ?ast.Expression,
-    cst: Cst,
     arena: std.mem.Allocator,
     diagnostics: *Diagnostics,
 ) !ir.Expression {
-    return if (expression) |it| lowerExpression(it, cst, arena, diagnostics) else .@"error";
+    return if (expression) |it| lowerExpression(it, arena, diagnostics) else .@"error";
 }
 
 fn box(allocator: std.mem.Allocator, value: anytype) !*@TypeOf(value) {

@@ -1,51 +1,55 @@
 nodes: std.MultiArrayList(struct {
     source: ?[]const u8,
     kind: SyntaxKind,
-    parent: ?Node,
+    parent: ?Node.Index,
     /// Indices into `Cst.children`.
     children: struct { start: Start, count: usize },
 }),
-children: std.ArrayListUnmanaged(Node),
+children: std.ArrayListUnmanaged(Node.Index),
 
 const Start = enum(usize) {
     token = std.math.maxInt(usize),
     _,
 };
 
-pub const Node = enum(usize) {
-    root = 0,
-    _,
+pub const Node = struct {
+    index: Index,
+    cst: Cst,
 
-    pub fn source(node: Node, cst: Cst) []const u8 {
-        return cst.nodes.items(.source)[@backingInt(node)].?;
+    pub fn source(node: Node) []const u8 {
+        return node.cst.nodes.items(.source)[@backingInt(node.index)].?;
     }
 
-    pub fn kind(node: Node, cst: Cst) SyntaxKind {
-        return cst.nodes.items(.kind)[@backingInt(node)];
+    pub fn kind(node: Node) SyntaxKind {
+        return node.cst.nodes.items(.kind)[@backingInt(node.index)];
     }
 
-    pub fn parent(node: Node, cst: Cst) ?Node {
-        return cst.nodes.items(.parent)[@backingInt(node)];
+    pub fn parent(node: Node) ?Node {
+        const index = node.cst.nodes.items(.parent)[@backingInt(node.index)] orelse return null;
+        return .{ .index = index, .cst = node.cst };
     }
 
-    pub fn children(node: Node, cst: Cst) ChildIterator {
-        const range = cst.nodes.items(.children)[@backingInt(node)];
+    pub fn children(node: Node) ChildIterator {
+        const range = node.cst.nodes.items(.children)[@backingInt(node.index)];
         std.debug.assert(range.start != .token);
         const start = @backingInt(range.start);
-        return .{ .start = start, .end = start + range.count };
+        return .{ .start = start, .end = start + range.count, .cst = node.cst };
     }
 
     pub const ChildIterator = struct {
         start: usize,
         end: usize,
+        cst: Cst,
 
-        pub fn next(iter: *ChildIterator, cst: Cst) ?Node {
+        pub fn next(iter: *ChildIterator) ?Node {
             if (iter.start < iter.end) {
                 defer iter.start += 1;
-                return cst.children.items[iter.start];
+                return .{ .index = iter.cst.children.items[iter.start], .cst = iter.cst };
             } else return null;
         }
     };
+
+    pub const Index = enum(usize) { root = 0, _ };
 };
 
 pub fn dump(cst: Cst) void {
@@ -113,7 +117,7 @@ pub const Builder = struct {
     const ThreadedNode = struct {
         source: ?[]const u8,
         kind: SyntaxKind,
-        parent: ?Node = null,
+        parent: ?Node.Index = null,
         /// Null iff this is a token.
         children: ?std.ArrayListUnmanaged(*ThreadedNode),
         next: ?*ThreadedNode = null,

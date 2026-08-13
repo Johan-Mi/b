@@ -1,25 +1,25 @@
 node: Cst.Node,
 
-pub fn resolve(token: Cst.Node, cst: Cst) ?Name {
-    std.debug.assert(token.kind(cst) == .identifier);
-    const name = token.source(cst);
-    var maybe_node = token.parent(cst);
-    return blk: while (maybe_node) |node| : (maybe_node = node.parent(cst)) {
-        if (ast.Document.cast(node, cst)) |document| {
-            var iterator = document.functions(cst);
-            while (iterator.next(cst)) |function| {
-                const it = function.name(cst) orelse continue;
-                if (std.mem.eql(u8, name, it.source(cst))) break :blk .{ .node = it };
+pub fn resolve(token: Cst.Node) ?Name {
+    std.debug.assert(token.kind() == .identifier);
+    const name = token.source();
+    var maybe_node = token.parent();
+    return blk: while (maybe_node) |node| : (maybe_node = node.parent()) {
+        if (ast.Document.cast(node)) |document| {
+            var iterator = document.functions();
+            while (iterator.next()) |function| {
+                const it = function.name() orelse continue;
+                if (std.mem.eql(u8, name, it.source())) break :blk .{ .node = it };
             }
-        } else if (ast.CompoundStatement.cast(node, cst)) |compound| {
-            var statements = compound.statements(cst);
-            while (statements.next(cst)) |statement| {
+        } else if (ast.CompoundStatement.cast(node)) |compound| {
+            var statements = compound.statements();
+            while (statements.next()) |statement| {
                 switch (statement) {
                     inline .auto, .extrn => |decls| {
-                        var iterator = decls.syntax.children(cst);
-                        while (iterator.next(cst)) |it| {
-                            if (it.kind(cst) == .identifier and
-                                std.mem.eql(u8, name, it.source(cst))) break :blk .{ .node = it };
+                        var iterator = decls.syntax.children();
+                        while (iterator.next()) |it| {
+                            if (it.kind() == .identifier and
+                                std.mem.eql(u8, name, it.source())) break :blk .{ .node = it };
                         }
                     },
                     else => {},

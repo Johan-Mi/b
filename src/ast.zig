@@ -91,10 +91,10 @@ pub const PrefixOperation = struct {
 
     pub const operand = ChildImpl(@This(), Expression).find;
 
-    pub fn operator(self: @This(), cst: Cst) ?Cst.Node {
-        var iterator = self.syntax.children(cst);
-        return while (iterator.next(cst)) |child| {
-            if (Parser.prefixBindingPower(child.kind(cst))) |_| break child;
+    pub fn operator(self: @This()) ?Cst.Node {
+        var iterator = self.syntax.children();
+        return while (iterator.next()) |child| {
+            if (Parser.prefixBindingPower(child.kind())) |_| break child;
         } else null;
     }
 };
@@ -107,10 +107,10 @@ pub const InfixOperation = struct {
     pub const lhs = ChildImpl(@This(), Expression).find;
     pub const rhs = ChildImpl(@This(), Rhs).find;
 
-    pub fn operator(self: @This(), cst: Cst) ?Cst.Node {
-        var iterator = self.syntax.children(cst);
-        return while (iterator.next(cst)) |child| {
-            if (Parser.infixBindingPower(child.kind(cst))) |_| break child;
+    pub fn operator(self: @This()) ?Cst.Node {
+        var iterator = self.syntax.children();
+        return while (iterator.next()) |child| {
+            if (Parser.infixBindingPower(child.kind())) |_| break child;
         } else null;
     }
 };
@@ -122,10 +122,10 @@ pub const PostfixOperation = struct {
 
     pub const operand = ChildImpl(@This(), Expression).find;
 
-    pub fn operator(self: @This(), cst: Cst) ?Cst.Node {
-        var iterator = self.syntax.children(cst);
-        return while (iterator.next(cst)) |child| {
-            if (Parser.postfixBindingPower(child.kind(cst))) |_| break child;
+    pub fn operator(self: @This()) ?Cst.Node {
+        var iterator = self.syntax.children();
+        return while (iterator.next()) |child| {
+            if (Parser.postfixBindingPower(child.kind())) |_| break child;
         } else null;
     }
 };
@@ -153,18 +153,18 @@ pub const Variable = struct {
 
 fn CastImpl(Self: type, syntax_kind: SyntaxKind) type {
     return struct {
-        fn cast(syntax: Cst.Node, cst: Cst) ?Self {
-            return if (syntax.kind(cst) == syntax_kind) .{ .syntax = syntax } else null;
+        fn cast(syntax: Cst.Node) ?Self {
+            return if (syntax.kind() == syntax_kind) .{ .syntax = syntax } else null;
         }
     };
 }
 
 fn CastUnionEnumImpl(Self: type) type {
     return struct {
-        fn cast(syntax: Cst.Node, cst: Cst) ?Self {
+        fn cast(syntax: Cst.Node) ?Self {
             const type_info = @typeInfo(Self).@"union";
             return inline for (type_info.field_names, type_info.field_types) |name, ty| {
-                if (ty.cast(syntax, cst)) |it| break @unionInit(Self, name, it);
+                if (ty.cast(syntax)) |it| break @unionInit(Self, name, it);
             } else null;
         }
     };
@@ -172,10 +172,10 @@ fn CastUnionEnumImpl(Self: type) type {
 
 fn ChildImpl(Self: type, Child: type) type {
     return struct {
-        fn find(self: Self, cst: Cst) ?Child {
-            var iterator = self.syntax.children(cst);
-            return while (iterator.next(cst)) |node| {
-                if (Child.cast(node, cst)) |child| break child;
+        fn find(self: Self) ?Child {
+            var iterator = self.syntax.children();
+            return while (iterator.next()) |node| {
+                if (Child.cast(node)) |child| break child;
             } else null;
         }
     };
@@ -183,10 +183,10 @@ fn ChildImpl(Self: type, Child: type) type {
 
 fn ChildTokenImpl(Self: type, syntax_kind: SyntaxKind) type {
     return struct {
-        fn find(self: Self, cst: Cst) ?Cst.Node {
-            var iterator = self.syntax.children(cst);
-            return while (iterator.next(cst)) |child| {
-                if (child.kind(cst) == syntax_kind) break child;
+        fn find(self: Self) ?Cst.Node {
+            var iterator = self.syntax.children();
+            return while (iterator.next()) |child| {
+                if (child.kind() == syntax_kind) break child;
             } else null;
         }
     };
@@ -196,20 +196,20 @@ fn ChildrenImpl(Self: type, Child: type) type {
     return struct {
         iterator: Cst.Node.ChildIterator,
 
-        fn init(self: Self, cst: Cst) @This() {
-            return .{ .iterator = self.syntax.children(cst) };
+        fn init(self: Self) @This() {
+            return .{ .iterator = self.syntax.children() };
         }
 
-        pub fn next(self: *@This(), cst: Cst) ?Child {
-            return while (self.iterator.next(cst)) |node| {
-                if (Child.cast(node, cst)) |child| break child;
+        pub fn next(self: *@This()) ?Child {
+            return while (self.iterator.next()) |node| {
+                if (Child.cast(node)) |child| break child;
             } else null;
         }
 
-        pub fn count(self: @This(), cst: Cst) usize {
+        pub fn count(self: @This()) usize {
             var copy = self;
             var i: usize = 0;
-            while (copy.next(cst)) |_| i += 1;
+            while (copy.next()) |_| i += 1;
             return i;
         }
     };
