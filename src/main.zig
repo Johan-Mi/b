@@ -63,9 +63,7 @@ fn realMain(init: std.process.Init, diagnostics: *Diagnostic.S) !void {
         }
     }
 
-    const cst = try Parser.parse(tokens.slice(), init.arena.allocator());
-
-    if (init.minimal.environ.containsConstant("DUMP_CST")) cst.dump();
+    const cst = try Parser.parse(source_code.ptr, tokens.slice(), init.arena.allocator());
 
     const program = try @import("ir/lowering.zig").lower(cst, init.arena.allocator(), diagnostics);
 

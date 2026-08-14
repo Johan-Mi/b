@@ -3,15 +3,16 @@ index: usize = 0,
 cst: Cst.Builder,
 
 pub fn parse(
+    source: [*]const u8,
     tokens: std.MultiArrayList(Token).Slice,
     arena: std.mem.Allocator,
 ) !Cst {
-    var p: Parser = .{ .tokens = tokens, .cst = .init(arena) };
+    var p: Parser = .{ .tokens = tokens, .cst = .init(source, arena) };
     try p.cst.startNode(.document);
     while (!p.at(.eof))
         try p.parseTopLevelItem();
     try p.cst.finishNode();
-    return p.cst.finish(arena);
+    return p.cst.finish();
 }
 
 fn parseTopLevelItem(p: *Parser) !void {
@@ -265,19 +266,15 @@ fn parseExpressionRecursively(p: *Parser, bp_min: BindingPower) !void {
         if (postfixBindingPower(op)) |bp_left| {
             if (bp_left < bp_min) break;
 
-            try p.cst.startNodeAt(checkpoint, .postfix_operation);
-
             try p.bump();
             if (op == .@"[") {
                 try p.parseExpression();
                 _ = try p.eat(.@"]");
             }
 
-            try p.cst.finishNode();
+            try p.cst.finishNodeAt(checkpoint, .postfix_operation);
         } else if (infixBindingPower(op)) |bp| {
             if (bp.left < bp_min) break;
-
-            try p.cst.startNodeAt(checkpoint, .infix_operation);
 
             try p.bump();
             if (op == .@"?") {
@@ -288,7 +285,7 @@ fn parseExpressionRecursively(p: *Parser, bp_min: BindingPower) !void {
             try p.parseExpressionRecursively(bp.right);
             try p.cst.finishNode();
 
-            try p.cst.finishNode();
+            try p.cst.finishNodeAt(checkpoint, .infix_operation);
         } else {
             break;
         }
@@ -398,7 +395,7 @@ fn parseAnything(p: *Parser) !void {
 fn bump(p: *Parser) !void {
     while (!p.at(.eof)) {
         const token = p.tokens.get(p.index);
-        try p.cst.token(token.kind, token.source);
+        try p.cst.token(token.kind, token.source.len);
         p.index += 1;
         if (token.kind != .trivia) break;
     }
@@ -418,7 +415,7 @@ fn skipTrivia(p: *Parser) !void {
     while (p.index < p.tokens.len) : (p.index += 1) {
         const token = p.tokens.get(p.index);
         if (token.kind != .trivia) break;
-        try p.cst.token(token.kind, token.source);
+        try p.cst.token(token.kind, token.source.len);
     }
 }
 
@@ -466,7 +463,7 @@ fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
     var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena.deinit();
 
-    _ = try parse(tokens.slice(), arena.allocator());
+    _ = try parse(input_bytes.ptr, tokens.slice(), arena.allocator());
 }
 
 const Parser = @This();

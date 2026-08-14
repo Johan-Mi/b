@@ -1,23 +1,16 @@
 nodes: std.MultiArrayList(struct {
-    source: ?[]const u8,
+    source: []const u8,
     kind: SyntaxKind,
-    parent: ?Node.Index,
-    /// Indices into `Cst.children`.
-    children: struct { start: Start, count: usize },
+    size: usize,
+    parent: Node.Index,
 }),
-children: std.ArrayListUnmanaged(Node.Index),
-
-const Start = enum(usize) {
-    token = std.math.maxInt(usize),
-    _,
-};
 
 pub const Node = struct {
     index: Index,
     cst: Cst,
 
     pub fn source(node: Node) []const u8 {
-        return node.cst.nodes.items(.source)[@intFromEnum(node.index)].?;
+        return node.cst.nodes.items(.source)[@intFromEnum(node.index)];
     }
 
     pub fn kind(node: Node) SyntaxKind {
@@ -25,157 +18,114 @@ pub const Node = struct {
     }
 
     pub fn parent(node: Node) ?Node {
-        const index = node.cst.nodes.items(.parent)[@intFromEnum(node.index)] orelse return null;
+        if (node.index == .root) return null;
+        const index = node.cst.nodes.items(.parent)[@intFromEnum(node.index)];
         return .{ .index = index, .cst = node.cst };
     }
 
     pub fn children(node: Node) ChildIterator {
-        const range = node.cst.nodes.items(.children)[@intFromEnum(node.index)];
-        std.debug.assert(range.start != .token);
-        const start = @intFromEnum(range.start);
-        return .{ .start = start, .end = start + range.count, .cst = node.cst };
+        const start = @intFromEnum(node.index);
+        const end = start + node.cst.nodes.items(.size)[@intFromEnum(node.index)];
+        return .{ .current = start + 1, .end = end, .cst = node.cst };
     }
 
     pub const ChildIterator = struct {
-        start: usize,
+        current: usize,
         end: usize,
         cst: Cst,
 
         pub fn next(iter: *ChildIterator) ?Node {
-            if (iter.start < iter.end) {
-                defer iter.start += 1;
-                return .{ .index = iter.cst.children.items[iter.start], .cst = iter.cst };
-            } else return null;
+            if (iter.current == iter.end) return null;
+            defer iter.current += iter.cst.nodes.items(.size)[iter.current];
+            return .{ .index = @enumFromInt(iter.current), .cst = iter.cst };
         }
     };
 
     pub const Index = enum(usize) { root = 0, _ };
 };
 
-pub fn dump(cst: Cst) void {
-    const nodes = cst.nodes.slice();
-    for (0.., nodes.items(.kind), nodes.items(.children)) |i, kind, children| {
-        if (children.start == .token) {
-            log.info("{}: {s}", .{ i, @tagName(kind) });
-        } else {
-            const child_slice =
-                cst.children.items[@intFromEnum(children.start)..][0..children.count];
-            log.info("{}: {s} {any}", .{ i, @tagName(kind), child_slice });
-        }
-    }
-}
-
 pub const Builder = struct {
-    events: std.ArrayListUnmanaged(Event) = .empty,
-    arena: std.mem.Allocator,
+    source: [*]const u8,
+    stack: std.ArrayList(Node.Index),
+    cst: Cst,
+    allocator: std.mem.Allocator,
 
-    const Event = union(enum) {
-        open: SyntaxKind,
-        token: struct {
-            source: []const u8,
-            kind: SyntaxKind,
-        },
-        close,
-    };
-
-    pub fn init(arena: std.mem.Allocator) Builder {
-        return .{ .arena = arena };
+    pub fn init(source: [*]const u8, allocator: std.mem.Allocator) Builder {
+        return .{
+            .source = source,
+            .stack = .empty,
+            .cst = .{ .nodes = .empty },
+            .allocator = allocator,
+        };
     }
 
-    pub fn finish(builder: Builder, allocator: std.mem.Allocator) !Cst {
-        var threaded_tree: ?*ThreadedNode = try builder.intoThreadedTree();
+    pub fn finish(builder: Builder) Cst {
+        std.debug.assert(builder.stack.items.len == 0);
+        var cst = builder.cst;
 
-        var cst: Cst = .{ .nodes = .empty, .children = .empty };
-
-        while (threaded_tree) |threaded_node| : (threaded_tree = threaded_node.next) {
-            if (threaded_node.index) |index|
-                cst.children.items[index] = @enumFromInt(cst.nodes.len);
-            const start: Start = if (threaded_node.children) |_|
-                @enumFromInt(cst.children.items.len)
-            else
-                .token;
-            const count = if (threaded_node.children) |c| c.items.len else 0;
-            const me = cst.nodes.len;
-            try cst.nodes.append(allocator, .{
-                .source = threaded_node.source,
-                .kind = threaded_node.kind,
-                .parent = threaded_node.parent,
-                .children = .{ .start = start, .count = count },
-            });
-            _ = try cst.children.addManyAsSlice(allocator, count);
-            if (threaded_node.children) |c| {
-                for (c.items, @intFromEnum(start)..) |child, index| {
-                    child.parent = @enumFromInt(me);
-                    child.index = index;
-                }
-            }
+        const sizes = cst.nodes.items(.size);
+        for (0..cst.nodes.len) |i| {
+            var iter = @as(Node, .{ .index = @enumFromInt(i), .cst = cst }).children();
+            while (iter.next()) |child| sizes[@intFromEnum(child.index)] = i;
         }
 
         return cst;
     }
 
-    const ThreadedNode = struct {
-        source: ?[]const u8,
-        kind: SyntaxKind,
-        parent: ?Node.Index = null,
-        /// Null iff this is a token.
-        children: ?std.ArrayListUnmanaged(*ThreadedNode),
-        next: ?*ThreadedNode = null,
-        index: ?usize = null,
-    };
-
-    fn intoThreadedTree(builder: Builder) !*ThreadedNode {
-        var stack: std.ArrayListUnmanaged(*ThreadedNode) = .empty;
-        var prev: ?*ThreadedNode = null;
-        var events = builder.events;
-        std.debug.assert(events.pop().? == .close);
-        const arena = builder.arena;
-        for (events.items) |event| {
-            switch (event) {
-                .open => |kind| {
-                    const node = try arena.create(ThreadedNode);
-                    node.* = .{ .source = null, .kind = kind, .children = .empty };
-                    try stack.append(arena, node);
-                    if (prev) |p| p.next = node;
-                    prev = node;
-                },
-                .token => |it| {
-                    const node = try arena.create(ThreadedNode);
-                    node.* = .{ .source = it.source, .kind = it.kind, .children = null };
-                    if (prev) |p| p.next = node;
-                    prev = node;
-                    try stack.items[stack.items.len - 1].children.?.append(arena, node);
-                },
-                .close => {
-                    const child = stack.pop().?;
-                    try stack.items[stack.items.len - 1].children.?.append(arena, child);
-                },
-            }
-        }
-        std.debug.assert(stack.items.len == 1);
-        return stack.items[0];
-    }
-
     pub fn startNode(builder: *Builder, kind: SyntaxKind) !void {
-        try builder.events.append(builder.arena, .{ .open = kind });
+        try builder.stack.ensureUnusedCapacity(builder.allocator, 1);
+        try builder.cst.nodes.ensureUnusedCapacity(builder.allocator, 1);
+        errdefer comptime unreachable;
+
+        builder.stack.appendAssumeCapacity(@enumFromInt(builder.cst.nodes.len));
+        builder.cst.nodes.appendAssumeCapacity(.{
+            .source = builder.source[0..0],
+            .kind = kind,
+            .size = undefined,
+            .parent = undefined,
+        });
     }
 
     pub fn finishNode(builder: *Builder) !void {
-        try builder.events.append(builder.arena, .close);
+        const index = @intFromEnum(builder.stack.pop().?);
+        const source = &builder.cst.nodes.items(.source)[index];
+        source.len = builder.source - source.ptr;
+        builder.cst.nodes.items(.size)[index] = builder.cst.nodes.len - index;
     }
 
-    pub fn token(builder: *Builder, kind: SyntaxKind, text: []const u8) !void {
-        try builder.events.append(builder.arena, .{ .token = .{ .source = text, .kind = kind } });
+    pub fn token(builder: *Builder, kind: SyntaxKind, source_size: usize) !void {
+        try builder.cst.nodes.ensureUnusedCapacity(builder.allocator, 1);
+        errdefer comptime unreachable;
+
+        defer builder.source += source_size;
+        builder.cst.nodes.appendAssumeCapacity(.{
+            .source = builder.source[0..source_size],
+            .kind = kind,
+            .size = 1,
+            .parent = undefined,
+        });
     }
 
-    pub const Checkpoint = enum(usize) { _ };
+    pub const Checkpoint = struct {
+        index: Node.Index,
+        source_start: [*]const u8,
+    };
 
     pub fn makeCheckpoint(builder: Builder) Checkpoint {
-        return @enumFromInt(builder.events.items.len);
+        return .{ .index = @enumFromInt(builder.cst.nodes.len), .source_start = builder.source };
     }
 
-    pub fn startNodeAt(builder: *Builder, checkpoint: Checkpoint, kind: SyntaxKind) !void {
-        try builder.events.insert(builder.arena, @intFromEnum(checkpoint), .{ .open = kind });
+    pub fn finishNodeAt(builder: *Builder, checkpoint: Checkpoint, kind: SyntaxKind) !void {
+        try builder.cst.nodes.ensureUnusedCapacity(builder.allocator, 1);
+        errdefer comptime unreachable;
+
+        const size = builder.cst.nodes.len - @intFromEnum(checkpoint.index) + 1;
+        builder.cst.nodes.appendAssumeCapacity(.{
+            .source = checkpoint.source_start[0 .. builder.source - checkpoint.source_start],
+            .kind = kind,
+            .size = size,
+            .parent = undefined,
+        });
     }
 };
 
