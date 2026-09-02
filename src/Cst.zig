@@ -133,4 +133,3 @@ const Cst = @This();
 
 const std = @import("std");
 const SyntaxKind = @import("syntax.zig").Kind;
-const log = std.log.scoped(.cst);
