@@ -63,10 +63,10 @@ pub const Builder = struct {
         std.debug.assert(builder.stack.items.len == 0);
         var cst = builder.cst;
 
-        const sizes = cst.nodes.items(.size);
+        const parents = cst.nodes.items(.parent);
         for (0..cst.nodes.len) |i| {
             var iter = @as(Node, .{ .index = @enumFromInt(i), .cst = cst }).children();
-            while (iter.next()) |child| sizes[@intFromEnum(child.index)] = i;
+            while (iter.next()) |child| parents[@intFromEnum(child.index)] = @enumFromInt(i);
         }
 
         return cst;
