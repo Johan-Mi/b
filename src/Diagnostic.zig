@@ -37,11 +37,10 @@ pub const S = struct {
         var writer = std.Io.File.stderr().writer(io, &buffer);
         var terminal: std.Io.Terminal = .{ .writer = &writer.interface, .mode = diagnostics.mode };
 
-        const slice = diagnostics.items.slice();
         for (
-            slice.items(.level),
-            slice.items(.message),
-            slice.items(.span),
+            diagnostics.items.items(.level),
+            diagnostics.items.items(.message),
+            diagnostics.items.items(.span),
         ) |level, message, maybe_span| {
             try terminal.setColor(.bold);
             try terminal.setColor(switch (level) {

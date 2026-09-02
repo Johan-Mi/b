@@ -1,10 +1,10 @@
-tokens: std.MultiArrayList(Token).Slice,
+tokens: std.MultiArrayList(Token),
 index: usize = 0,
 cst: Cst.Builder,
 
 pub fn parse(
     source: [*]const u8,
-    tokens: std.MultiArrayList(Token).Slice,
+    tokens: std.MultiArrayList(Token),
     arena: std.mem.Allocator,
 ) !Cst {
     var p: Parser = .{ .tokens = tokens, .cst = .init(source, arena) };
@@ -463,7 +463,7 @@ fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
     var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena.deinit();
 
-    _ = try parse(input_bytes.ptr, tokens.slice(), arena.allocator());
+    _ = try parse(input_bytes.ptr, tokens, arena.allocator());
 }
 
 const Parser = @This();
