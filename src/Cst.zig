@@ -97,13 +97,13 @@ pub const Builder = struct {
         try builder.cst.nodes.ensureUnusedCapacity(builder.allocator, 1);
         errdefer comptime unreachable;
 
-        defer builder.source += source_size;
         builder.cst.nodes.appendAssumeCapacity(.{
             .source = builder.source[0..source_size],
             .kind = kind,
             .size = 1,
             .parent = undefined,
         });
+        builder.source += source_size;
     }
 
     pub const Checkpoint = struct {
